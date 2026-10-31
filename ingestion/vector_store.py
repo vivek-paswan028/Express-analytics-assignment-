@@ -86,6 +86,7 @@ class VectorStore:
         to_add_ids: list[str] = []
         to_add_docs: list[str] = []
         to_add_metas: list[dict] = []
+        seen_batch_ids: set[str] = set()
         skipped = 0
         ingested_at = datetime.now(timezone.utc).isoformat()
 
@@ -94,9 +95,19 @@ class VectorStore:
             if content_hash and content_hash in existing_hashes:
                 skipped += 1
                 continue
+            if content_hash:
+                existing_hashes.add(content_hash)
 
-            chunk_id = chunk.metadata.get("chunk_id", f"chunk_{len(to_add_ids)}")
+            base_chunk_id = chunk.metadata.get("chunk_id", f"chunk_{len(to_add_ids)}")
+            chunk_id = base_chunk_id
+            suffix = 1
+            while chunk_id in seen_batch_ids:
+                chunk_id = f"{base_chunk_id}_{suffix}"
+                suffix += 1
+
+            seen_batch_ids.add(chunk_id)
             meta = {k: str(v) for k, v in chunk.metadata.items()}  # Chroma needs str values
+            meta["chunk_id"] = chunk_id
             meta["ingested_at"] = ingested_at
 
             to_add_ids.append(chunk_id)

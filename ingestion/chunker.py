@@ -78,6 +78,7 @@ def chunk_documents(
     )
 
     all_chunks: list[Document] = []
+    chunk_counters: dict[str, int] = {}
 
     for doc in documents:
         raw_chunks = splitter.split_documents([doc])
@@ -85,7 +86,10 @@ def chunk_documents(
         doc_id = doc.metadata.get("doc_id", "unknown")
         full_text = doc.page_content
 
-        for idx, chunk in enumerate(raw_chunks):
+        for chunk in raw_chunks:
+            idx = chunk_counters.get(doc_id, 0)
+            chunk_counters[doc_id] = idx + 1
+
             char_start = chunk.metadata.get("start_index", 0)
             heading = _detect_nearest_heading(chunk.page_content, full_text, char_start)
             chunk_id = f"{doc_id}_chunk_{idx:04d}"
