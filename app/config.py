@@ -1,11 +1,3 @@
-"""
-app/config.py
-─────────────
-Centralised settings loaded from environment variables / .env file.
-All modules import `get_settings()` rather than reading os.environ directly.
-This makes the settings testable (override via env vars in pytest) and
-documents every configurable parameter in one place.
-"""
 from __future__ import annotations
 
 from functools import lru_cache
@@ -19,49 +11,35 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore",  # silently ignore unrecognised env vars
+        extra="ignore",
     )
 
-    # ── LLM (supports latest Google Gemini API: GEMINI_API_KEY or GOOGLE_API_KEY)
     google_api_key: str = ""
     gemini_api_key: str = ""
     llm_model: str = "gemini-3.8-flash"
     llm_temperature: float = 0.0
 
-    # ── Embeddings ───────────────────────────────────────────────────
-    # Local sentence-transformers model; downloaded once to HF cache.
     embedding_model: str = "all-MiniLM-L6-v2"
 
-    # ── Vector store ─────────────────────────────────────────────────
     chroma_persist_dir: str = "./chroma_db"
     chroma_collection_name: str = "rag_documents"
 
-    # ── Retrieval ────────────────────────────────────────────────────
     retrieval_top_k: int = 5
-    # Max query-rewrite + re-retrieval cycles before returning fallback.
-    # 2 is a deliberate choice: one retry handles vocabulary mismatch,
-    # a second handles broader reformulation. A third rarely helps on a
-    # small local corpus and adds noticeable latency.
     max_retries: int = 2
 
-    # ── Ingestion ────────────────────────────────────────────────────
     chunk_size: int = 800
     chunk_overlap: int = 100
     max_upload_size_mb: int = 5
-    auto_ingest_corpus: bool = False  # Set to True only if automatic sample corpus loading is desired
+    auto_ingest_corpus: bool = False
 
-    # ── FastAPI ───────────────────────────────────────────────────────
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     app_debug: bool = False
 
-    # ── Feedback ─────────────────────────────────────────────────────
     feedback_log_path: str = "./data/feedback.jsonl"
 
-    # ── Optional bonus ───────────────────────────────────────────────
     tavily_api_key: str = ""
 
-    # ── Derived helpers ───────────────────────────────────────────────
     @property
     def chroma_persist_path(self) -> Path:
         return Path(self.chroma_persist_dir).resolve()
@@ -74,7 +52,6 @@ class Settings(BaseSettings):
 
     @property
     def effective_api_key(self) -> str:
-        """Returns GEMINI_API_KEY if present, otherwise GOOGLE_API_KEY."""
         return self.gemini_api_key.strip() or self.google_api_key.strip()
 
     @property
@@ -84,6 +61,5 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Return a cached Settings instance (constructed once per process)."""
     return Settings()
 

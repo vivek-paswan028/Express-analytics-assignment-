@@ -1,14 +1,3 @@
-"""
-rag/nodes/fallback.py
-──────────────────────
-Terminal fallback node — reached when:
-  1. retry_count >= max_retries AND no relevant documents found, OR
-  2. A node sets state["error"] (e.g. LLM API failure).
-
-Returns an honest "I don't know" response rather than a hallucinated answer.
-The response distinguishes between "topic not in corpus" and "system error"
-so the user can take appropriate action.
-"""
 from __future__ import annotations
 
 import logging
@@ -45,13 +34,9 @@ _GREETING_MESSAGE = (
 
 
 def fallback_node(state: RAGState) -> dict:
-    """
-    Return a structured response when no relevant context is retrieved or on errors.
-    """
     error = state.get("error")
     retry_count = state.get("retry_count", 0)
 
-    # Conversational greeting
     if state.get("query_type") == "conversational":
         return {
             "answer": _GREETING_MESSAGE,
@@ -60,16 +45,13 @@ def fallback_node(state: RAGState) -> dict:
         }
 
     if error:
-        # System error (LLM/retrieval failure)
         logger.warning(
             "Fallback triggered by system error (retry=%d): %s",
             retry_count, error,
         )
-        # Provide a user-facing message without exposing raw stack traces
         user_error = error.split(":")[0] if ":" in error else "Internal error"
         answer = _SYSTEM_ERROR_MESSAGE.format(error=user_error)
     else:
-        # Exhausted retries with no relevant context
         logger.info(
             "Fallback: no relevant documents found after %d retries for: '%s'",
             retry_count, state.get("original_question", "")[:80],

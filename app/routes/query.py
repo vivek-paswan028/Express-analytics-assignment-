@@ -1,8 +1,3 @@
-"""
-app/routes/query.py
-────────────────────
-POST /query — submit a question; receive an answer with citations.
-"""
 from __future__ import annotations
 
 import logging
@@ -20,16 +15,6 @@ settings = get_settings()
 
 @router.post("/query", response_model=QueryResponse, summary="Ask a question")
 def query_documents(request: QueryRequest) -> QueryResponse:
-    """
-    Submit a natural language question and receive an answer grounded in
-    the indexed technical documentation.
-
-    The response includes:
-    - `answer`: generated text with inline [Source N] citations
-    - `sources`: list of document chunks used
-    - `generation_supported`: False if no relevant context was found
-    - `retry_count`: how many query rewrites were attempted
-    """
     if not settings.has_llm_key:
         raise HTTPException(
             status_code=503,
@@ -46,7 +31,6 @@ def query_documents(request: QueryRequest) -> QueryResponse:
             max_retries=settings.max_retries,
         )
 
-        # Convert TypedDict sources to Pydantic SourceMetadata
         sources = [
             SourceMetadata(
                 doc_id=s.get("doc_id", ""),

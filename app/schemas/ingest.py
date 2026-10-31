@@ -1,8 +1,3 @@
-"""
-app/schemas/ingest.py
-──────────────────────
-Request and response schemas for POST /ingest.
-"""
 from __future__ import annotations
 
 from typing import Optional
@@ -10,7 +5,6 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class URLIngestRequest(BaseModel):
-    """Ingest documents by URL (JSON body)."""
     urls: list[str] = Field(
         ...,
         min_length=1,
@@ -41,7 +35,6 @@ class URLIngestRequest(BaseModel):
 
 
 class IngestResult(BaseModel):
-    """Result for one successfully ingested source."""
     source: str
     doc_id: str
     chunks_added: int
@@ -49,7 +42,6 @@ class IngestResult(BaseModel):
 
 
 class IngestError(BaseModel):
-    """Error details for one failed source."""
     source: str
     error: str
 

@@ -1,15 +1,3 @@
-"""
-rag/state.py
-─────────────
-LangGraph state schema for the self-corrective RAG workflow.
-
-Design rationale:
-- TypedDict is used (not Pydantic BaseModel) because LangGraph's StateGraph
-  works natively with TypedDict and handles reducer functions via Annotated.
-- The schema documents every field's purpose and lifecycle.
-- retry_count and max_retries are both in state so the routing function
-  is a pure function of state (no global config needed at routing time).
-"""
 from __future__ import annotations
 
 from typing import Any, Optional
@@ -19,37 +7,20 @@ from langchain_core.documents import Document
 
 
 class SourceMetadata(TypedDict):
-    """Citation information for one chunk used in the answer."""
     doc_id: str
-    source: str       # filename or URL
+    source: str
     chunk_id: str
-    heading: str      # nearest section heading in the source document
+    heading: str
 
 
 class RAGState(TypedDict):
-    """
-    Complete state that flows through every node of the RAG workflow.
 
-    Fields are grouped by lifecycle phase:
-    ┌────────────────────────────────────────────────────────────┐
-    │ INPUT          Set at entry; never mutated.               │
-    │ QUERY          Updated by query_analysis (and rewrite).   │
-    │ RETRIEVAL      Updated by retrieval node.                 │
-    │ GRADING        Updated by grading node.                   │
-    │ SELF-CORRECT   Updated by routing / rewrite logic.        │
-    │ OUTPUT         Set by generation or fallback node.        │
-    │ ERROR          Set if any node encounters an exception.   │
-    └────────────────────────────────────────────────────────────┘
-    """
-
-    # ── INPUT ─────────────────────────────────────────────────────────────
     original_question: str
     """The raw question exactly as submitted by the user. Never modified."""
 
     top_k: int
     """Number of chunks to retrieve. Passed from the API request."""
 
-    # ── QUERY PROCESSING ──────────────────────────────────────────────────
     rewritten_query: str
     """
     The query sent to the vector store. On the first pass this is the
@@ -64,18 +35,15 @@ class RAGState(TypedDict):
     Used as a hint for retrieval expansion and prompt construction.
     """
 
-    # ── RETRIEVAL ─────────────────────────────────────────────────────────
     retrieved_documents: list[Document]
     """Raw chunks returned by the vector store for the current query."""
 
-    # ── GRADING ───────────────────────────────────────────────────────────
     relevant_documents: list[Document]
     """
     Subset of retrieved_documents graded 'relevant' by the LLM.
     If empty after grading, routing triggers a retry or fallback.
     """
 
-    # ── SELF-CORRECTION ───────────────────────────────────────────────────
     retry_count: int
     """
     Number of query-rewrite + re-retrieval cycles completed so far.
@@ -90,7 +58,6 @@ class RAGState(TypedDict):
     looping back. Default: 2 (see config.py for rationale).
     """
 
-    # ── OUTPUT ────────────────────────────────────────────────────────────
     answer: str
     """
     The final answer returned to the user.
@@ -111,7 +78,6 @@ class RAGState(TypedDict):
     False → fallback path was taken (no sufficient evidence found).
     """
 
-    # ── ERROR ─────────────────────────────────────────────────────────────
     error: Optional[str]
     """
     If a node catches an unrecoverable exception it stores the message

@@ -1,18 +1,9 @@
-"""
-ui.py
-─────
-Interactive Streamlit frontend for the RAG Technical Documentation Assistant.
-Features:
-  - Tab 1: 💬 Q&A Chat Assistant with pipeline trace & citations
-  - Tab 2: 📁 Document Management (Upload files, Ingest from URL, View catalog, Clear database)
-"""
 from __future__ import annotations
 
 import os
 import requests
 import streamlit as st
 
-# ── Configuration & Page Setup ───────────────────────────────────────────────
 st.set_page_config(
     page_title="RAG Documentation Assistant",
     page_icon="🤖",
@@ -23,7 +14,6 @@ st.set_page_config(
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
 
-# ── API Helper Functions ─────────────────────────────────────────────────────
 def fetch_health():
     try:
         res = requests.get(f"{API_BASE_URL}/health", timeout=3)
@@ -31,7 +21,6 @@ def fetch_health():
             return res.json()
     except Exception:
         pass
-    # Try localhost fallback if 127.0.0.1 didn't respond
     if "127.0.0.1" in API_BASE_URL:
         try:
             res = requests.get(f"{API_BASE_URL.replace('127.0.0.1', 'localhost')}/health", timeout=3)
@@ -124,7 +113,6 @@ def ingest_url(url: str):
     raise RuntimeError(f"URL ingest failed ({res.status_code}): {data.get('detail', res.text)}")
 
 
-# ── Sidebar: System Health & Navigation ───────────────────────────────────────
 with st.sidebar:
     st.title("⚙️ System Control")
     health = fetch_health()
@@ -164,20 +152,14 @@ with st.sidebar:
         st.info("No documents currently indexed.")
 
 
-# ── Main Content Area ────────────────────────────────────────────────────────
 st.title("🤖 Technical Documentation Assistant")
 st.caption("Self-corrective RAG with LangGraph, ChromaDB, and FastAPI")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# VIEW 1: Chat Q&A
-# ─────────────────────────────────────────────────────────────────────────────
 if page_nav == "💬 Ask Questions (Chat)":
-    # Initialize Chat History
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Sample Questions
     st.markdown("**Suggested Questions:**")
     sample_cols = st.columns(4)
     sample_prompts = [
@@ -195,7 +177,6 @@ if page_nav == "💬 Ask Questions (Chat)":
 
     st.markdown("---")
 
-    # Render Chat History
     for idx, message in enumerate(st.session_state.messages):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -203,7 +184,6 @@ if page_nav == "💬 Ask Questions (Chat)":
             if message["role"] == "assistant" and "metadata" in message:
                 meta = message["metadata"]
 
-                # Expandable pipeline trace
                 with st.expander("🔍 Pipeline Trace & Citations"):
                     col_a, col_b, col_c = st.columns(3)
                     with col_a:
@@ -225,7 +205,6 @@ if page_nav == "💬 Ask Questions (Chat)":
                     else:
                         st.info("No source chunks utilized (fallback path triggered).")
 
-                # Feedback widget
                 if f"feedback_{idx}" not in st.session_state:
                     fb_col1, _ = st.columns([1, 4])
                     with fb_col1:
@@ -237,7 +216,6 @@ if page_nav == "💬 Ask Questions (Chat)":
                                 st.toast("Feedback recorded to data/feedback.jsonl!", icon="✅")
                                 st.rerun()
 
-    # User Input
     user_query = st.chat_input("Ask a question about the indexed documentation...") or selected_prompt
 
     if user_query:
@@ -270,9 +248,6 @@ if page_nav == "💬 Ask Questions (Chat)":
                     st.error(f"Failed to generate answer: {str(e)}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# VIEW 2: Document Management & Ingestion
-# ─────────────────────────────────────────────────────────────────────────────
 elif page_nav == "📁 Manage & Ingest Documents":
     st.subheader("📁 Ingest New Documentation")
     st.markdown("Upload documents or enter URLs to index them into ChromaDB.")
@@ -302,7 +277,6 @@ elif page_nav == "📁 Manage & Ingest Documents":
                         else:
                             st.warning("No new chunks added. (Files might already be indexed or contain duplicate content).")
 
-                        # Display per-file breakdown
                         for item in result.get("ingested", []):
                             st.markdown(f"- **{item['source']}**: `{item['chunks_added']} added`, `{item['chunks_skipped_duplicate']} skipped (duplicates)`")
 

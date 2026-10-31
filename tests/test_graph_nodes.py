@@ -1,9 +1,3 @@
-"""
-tests/test_graph_nodes.py
-──────────────────────────
-Unit tests for individual LangGraph nodes.
-All LLM calls are mocked — these tests run without an API key.
-"""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -15,7 +9,6 @@ from rag.state import RAGState
 
 
 def _make_state(**overrides) -> RAGState:
-    """Build a minimal valid RAGState with sensible defaults."""
     base: RAGState = {
         "original_question": "What is a StateGraph?",
         "top_k": 5,
@@ -45,8 +38,6 @@ def _make_doc(content: str, source: str = "test.md", chunk_id: str = "chunk_001"
         },
     )
 
-
-# ── Routing tests (pure functions, no mocking needed) ─────────────────────────
 
 class TestRouting:
     def test_routes_to_fallback_for_conversational_query_analysis(self):
@@ -89,12 +80,9 @@ class TestRouting:
 
     def test_fallback_when_retry_equals_max(self):
         from rag.routing import route_after_grading
-        # At exactly max_retries → fallback (not equal to, but >= max)
         state = _make_state(relevant_documents=[], retry_count=3, max_retries=2)
         assert route_after_grading(state) == "fallback"
 
-
-# ── Fallback node tests ───────────────────────────────────────────────────────
 
 class TestFallbackNode:
     def test_fallback_no_error(self):
@@ -120,11 +108,8 @@ class TestFallbackNode:
         assert "foo.py" not in result["answer"]
 
 
-# ── Retrieval node tests ──────────────────────────────────────────────────────
-
 class TestRetrievalNode:
     def test_retrieval_uses_rewritten_query(self):
-        """Retrieval node calls similarity_search with the rewritten query."""
         from rag.nodes.retrieval import retrieval_node
 
         mock_store = MagicMock()
@@ -158,7 +143,6 @@ class TestRetrievalNode:
         assert call_args[1]["query"] == "What is ChromaDB?" or call_args[0][0] == "What is ChromaDB?"
 
     def test_retrieval_handles_store_exception(self):
-        """Store failure → empty list + error in state (no crash)."""
         from rag.nodes.retrieval import retrieval_node
 
         mock_store = MagicMock()
@@ -172,8 +156,6 @@ class TestRetrievalNode:
         assert result["error"] is not None
 
 
-# ── Query analysis node tests (mocked LLM) ────────────────────────────────────
-
 class TestQueryAnalysisNode:
     def _mock_analysis_result(self, query_type="how-to", rewritten="expanded query"):
         from rag.nodes.query_analysis import QueryAnalysisResult
@@ -184,7 +166,6 @@ class TestQueryAnalysisNode:
         )
 
     def test_conversational_greeting_fast_path(self):
-        """Conversational greetings are detected without calling the LLM."""
         from rag.nodes.query_analysis import query_analysis_node
 
         with patch("rag.nodes.query_analysis.get_gemini_llm") as mock_get_llm:
@@ -217,7 +198,7 @@ class TestQueryAnalysisNode:
 
         assert result["rewritten_query"] == "add conditional edge LangGraph StateGraph routing"
         assert result["query_type"] == "how-to"
-        assert "retry_count" not in result  # first pass doesn't increment
+        assert "retry_count" not in result
 
     def test_retry_pass_increments_retry_count(self):
         from rag.nodes.query_analysis import query_analysis_node
@@ -236,10 +217,9 @@ class TestQueryAnalysisNode:
                 relevant_documents=[],
             ))
 
-        assert result["retry_count"] == 2  # incremented from 1
+        assert result["retry_count"] == 2
 
     def test_graceful_fallback_on_llm_failure(self):
-        """Node falls back to original question if LLM throws."""
         from rag.nodes.query_analysis import query_analysis_node
 
         with patch("rag.nodes.query_analysis.get_gemini_llm") as mock_get_llm:
@@ -252,16 +232,12 @@ class TestQueryAnalysisNode:
                 retry_count=0,
             ))
 
-        # Should not crash; falls back to original question
         assert result["rewritten_query"] == "What is ChromaDB?"
         assert result["query_type"] == "unknown"
 
 
-# ── Grading node tests ────────────────────────────────────────────────────────
-
 class TestGradingNode:
     def test_filters_irrelevant_documents(self):
-        """Documents graded irrelevant are excluded from relevant_documents."""
         from rag.nodes.grading import grading_node, BatchGradingResult, ChunkEvaluation
 
         relevant_doc = _make_doc("LangGraph StateGraph has nodes and edges.", "langgraph.md")
@@ -295,7 +271,6 @@ class TestGradingNode:
         assert result["relevant_documents"] == []
 
     def test_grading_exception_falls_back_safely(self):
-        """When grading throws, node handles it gracefully by keeping retrieved chunks."""
         from rag.nodes.grading import grading_node
 
         broken_grader = MagicMock()
@@ -306,8 +281,6 @@ class TestGradingNode:
             result = grading_node(_make_state(retrieved_documents=[doc]))
         assert len(result["relevant_documents"]) == 1
 
-
-# ── Generation node tests ───────────────────────────────────────────────────
 
 class TestGenerationNode:
     def test_generation_with_string_content(self):
@@ -331,7 +304,6 @@ class TestGenerationNode:
         assert len(result["sources"]) == 1
 
     def test_generation_with_multimodal_list_content(self):
-        """Supports Gemini 3 list-of-dicts content response."""
         from rag.nodes.generation import generation_node
         doc = _make_doc("FastAPI route parameters")
         state = _make_state(

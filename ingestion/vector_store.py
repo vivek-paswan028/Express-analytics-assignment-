@@ -1,18 +1,3 @@
-"""
-ingestion/vector_store.py
-──────────────────────────
-ChromaDB integration: add chunks, query, list, and manage documents.
-
-Why ChromaDB over FAISS?
-- Persists to disk automatically — no manual serialisation needed.
-- Supports metadata filtering (used for GET /documents listing).
-- Simple Python API; runs locally with no external services.
-- HNSW index gives O(log n) query time, more than sufficient for ~100 chunks.
-
-Trade-off: FAISS is faster for raw ANN search and uses less memory,
-but requires explicit save/load and doesn't support metadata listing,
-making GET /documents more complex to implement.
-"""
 from __future__ import annotations
 
 import logging
@@ -31,12 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class VectorStore:
-    """
-    Thin wrapper around a persistent ChromaDB collection.
-
-    All public methods operate on LangChain Document objects so that
-    the rest of the codebase doesn't need to import chromadb directly.
-    """
 
     def __init__(self, persist_dir: str, collection_name: str, embedding_model_name: str):
         self._persist_dir = Path(persist_dir)
@@ -57,23 +36,11 @@ class VectorStore:
             collection_name, persist_dir, self._collection.count(),
         )
 
-    # ── Ingestion ──────────────────────────────────────────────────────────
 
     def add_documents(self, chunks: list[Document]) -> dict[str, int]:
-        """
-        Add a list of chunked Documents to ChromaDB.
-
-        Deduplication: chunks whose content_hash already exists in the
-        collection are skipped. This prevents double-ingestion when
-        the same file is uploaded twice.
-
-        Returns:
-            {"added": N, "skipped_duplicate": M}
-        """
         if not chunks:
             return {"added": 0, "skipped_duplicate": 0}
 
-        # Batch-check existing hashes
         existing_hashes: set[str] = set()
         try:
             existing = self._collection.get(include=["metadatas"])
@@ -106,7 +73,7 @@ class VectorStore:
                 suffix += 1
 
             seen_batch_ids.add(chunk_id)
-            meta = {k: str(v) for k, v in chunk.metadata.items()}  # Chroma needs str values
+            meta = {k: str(v) for k, v in chunk.metadata.items()}
             meta["chunk_id"] = chunk_id
             meta["ingested_at"] = ingested_at
 
@@ -118,11 +85,9 @@ class VectorStore:
             logger.info("All %d chunks were duplicates; nothing added.", skipped)
             return {"added": 0, "skipped_duplicate": skipped}
 
-        # Generate embeddings
         embeddings = self._embedding_model.embed_documents(to_add_docs)
 
-        # Batch upsert to ChromaDB
-        BATCH_SIZE = 500  # ChromaDB recommended batch limit
+        BATCH_SIZE = 500
         for i in range(0, len(to_add_ids), BATCH_SIZE):
             self._collection.upsert(
                 ids=to_add_ids[i:i + BATCH_SIZE],
@@ -134,15 +99,8 @@ class VectorStore:
         logger.info("Added %d chunks (%d skipped as duplicates).", len(to_add_ids), skipped)
         return {"added": len(to_add_ids), "skipped_duplicate": skipped}
 
-    # ── Retrieval ─────────────────────────────────────────────────────────
 
     def similarity_search(self, query: str, k: int = 5) -> list[Document]:
-        """
-        Return the top-k most relevant chunks for a query.
-
-        Returns LangChain Document objects with full metadata,
-        including a 'score' field (cosine distance, lower = more similar).
-        """
         if self._collection.count() == 0:
             logger.warning("Vector store is empty — no documents indexed.")
             return []
@@ -167,22 +125,14 @@ class VectorStore:
 
         return docs
 
-    # ── Document listing ──────────────────────────────────────────────────
 
     def list_documents(self) -> list[dict[str, Any]]:
-        """
-        Return a summary of all indexed documents grouped by doc_id.
-
-        Used by GET /documents. Groups chunks by their source document
-        and returns aggregate stats (chunk count, first ingestion timestamp).
-        """
         if self._collection.count() == 0:
             return []
 
         all_items = self._collection.get(include=["metadatas"])
         metadatas = all_items.get("metadatas") or []
 
-        # Group by doc_id
         docs: dict[str, dict] = {}
         for meta in metadatas:
             if not meta:
@@ -204,12 +154,10 @@ class VectorStore:
         return self._collection.count()
 
     def document_exists(self, doc_id: str) -> bool:
-        """Check whether any chunk with the given doc_id exists."""
         result = self._collection.get(where={"doc_id": doc_id}, limit=1)
         return bool(result.get("ids"))
 
     def clear_all_documents(self) -> int:
-        """Clear all documents from the collection. Returns count of deleted chunks."""
         count = self._collection.count()
         if count > 0:
             all_items = self._collection.get()
@@ -220,7 +168,6 @@ class VectorStore:
         return count
 
     def delete_document(self, doc_id: str) -> int:
-        """Delete all chunks for a given doc_id. Returns count deleted."""
         existing = self._collection.get(where={"doc_id": doc_id})
         ids = existing.get("ids", [])
         if ids:
@@ -228,13 +175,10 @@ class VectorStore:
         return len(ids)
 
 
-# ── Singleton accessor ─────────────────────────────────────────────────────
-
 _store_instance: Optional[VectorStore] = None
 
 
 def get_vector_store() -> VectorStore:
-    """Return the global VectorStore singleton, auto-initialising if not yet set."""
     global _store_instance
     if _store_instance is None:
         from app.config import get_settings
@@ -253,7 +197,6 @@ def init_vector_store(
     collection_name: str,
     embedding_model_name: str,
 ) -> VectorStore:
-    """Initialise the global VectorStore. Called once at app startup."""
     global _store_instance
     _store_instance = VectorStore(persist_dir, collection_name, embedding_model_name)
     return _store_instance

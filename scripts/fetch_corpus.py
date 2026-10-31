@@ -1,36 +1,19 @@
-#!/usr/bin/env python3
-"""
-scripts/fetch_corpus.py
-────────────────────────
-Reproducible corpus fetch script.
-
-Run this to (re-)download the corpus documents from their canonical
-GitHub raw URLs into docs/corpus/. The documents are also committed
-to the repository, so this script is only needed if you want to
-refresh them or start fresh.
-
-Usage:
-    cd rag-docs-assistant
-    python scripts/fetch_corpus.py
-"""
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import requests
 
 CORPUS_DIR = Path(__file__).parent.parent / "docs" / "corpus"
 
-# Canonical URLs for the 5 corpus documents
 CORPUS_SOURCES = [
     {
         "url": "https://raw.githubusercontent.com/langchain-ai/langgraph/main/docs/docs/concepts/low_level.md",
         "filename": "langgraph_concepts.md",
-        "fallback": None,  # use local file if download fails
+        "fallback": None,
     },
     {
         "url": "https://raw.githubusercontent.com/langchain-ai/langchain/master/docs/docs/concepts/rag.mdx",

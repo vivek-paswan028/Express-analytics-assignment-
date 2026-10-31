@@ -1,14 +1,3 @@
-"""
-rag/nodes/grading.py
-─────────────────────
-Node 3 of the LangGraph RAG workflow — the self-corrective component.
-
-Evaluates whether retrieved chunks are relevant to the user's question.
-High-Performance Batch Grading:
-Instead of making N sequential API roundtrips (1 per chunk), this node
-grades all retrieved chunks in a single structured LLM call. This reduces
-latency from 15-30s down to 1-2s and avoids free-tier rate limit exhaustion.
-"""
 from __future__ import annotations
 
 import logging
@@ -46,19 +35,12 @@ class BatchGradingResult(BaseModel):
     evaluations: list[ChunkEvaluation] = Field(description="List of evaluations for all provided chunks.")
 
 
-# Fallback single-chunk grade model (for unit test compatibility)
 class DocumentGrade(BaseModel):
     score: Literal["relevant", "irrelevant"] = Field(description="'relevant' or 'irrelevant'")
     reasoning: str = Field(description="One brief sentence explaining the grade.")
 
 
 def grading_node(state: RAGState) -> dict:
-    """
-    Grade all retrieved documents in a single structured batch call.
-
-    Returns an update to state with:
-    - relevant_documents: filtered list of chunks graded as 'relevant'
-    """
     question = state["original_question"]
     retrieved = state.get("retrieved_documents", [])
 
@@ -66,20 +48,17 @@ def grading_node(state: RAGState) -> dict:
         logger.info("Grading: no documents to grade (retrieval returned 0 results).")
         return {"relevant_documents": []}
 
-    # If question is classified as conversational, skip grading
     if state.get("query_type") == "conversational":
         return {"relevant_documents": []}
 
     try:
         llm = get_gemini_llm(temperature=0.0)
 
-        # Build combined prompt with all chunks numbered
         chunk_descriptions = []
         for i, doc in enumerate(retrieved):
             source = doc.metadata.get("source", "unknown")
             heading = doc.metadata.get("heading", "")
             location = f"{source} — {heading}" if heading else source
-            # Trim chunk preview to 500 chars to avoid token bloat and latency
             chunk_descriptions.append(
                 f"[Chunk {i}] (Source: {location})\n{doc.page_content[:500]}"
             )
@@ -115,7 +94,6 @@ def grading_node(state: RAGState) -> dict:
 
     except Exception as e:
         logger.warning("Batch grading failed: %s — gracefully keeping retrieved chunks", e)
-        # Graceful fallback: preserve retrieved chunks so generation can still answer
         return {
             "relevant_documents": retrieved,
         }

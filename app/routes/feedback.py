@@ -1,21 +1,3 @@
-"""
-app/routes/feedback.py
-───────────────────────
-POST /feedback — record thumbs-up/down feedback on an answer.
-
-Persistence strategy: feedback is appended to a JSONL file (one JSON
-object per line). This is appropriate for a demo/intern project — it's
-simple, crash-safe (append-only), and human-readable.
-
-What feedback is NOT used for:
-- Automatic model retraining (this system uses API-hosted LLMs).
-- Modifying retrieval weights or rankings in real time.
-
-What feedback COULD be used for (future improvement):
-- Offline analysis to identify poorly answered question categories.
-- Fine-tuning a local grading or generation model.
-- Flagging answers for human review.
-"""
 from __future__ import annotations
 
 import json
@@ -36,12 +18,6 @@ settings = get_settings()
 
 @router.post("/feedback", response_model=FeedbackResponse, summary="Submit answer feedback")
 def submit_feedback(request: FeedbackRequest) -> FeedbackResponse:
-    """
-    Record a thumbs-up or thumbs-down rating for an answer, with an
-    optional free-text comment.
-
-    Feedback is stored in an append-only JSONL log file.
-    """
     feedback_id = f"fb_{uuid.uuid4().hex[:12]}"
     record = {
         "feedback_id": feedback_id,

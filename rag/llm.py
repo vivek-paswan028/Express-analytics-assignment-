@@ -1,12 +1,3 @@
-"""
-rag/llm.py
-──────────
-Factory for Google Gemini language models using the latest Google GenAI specifications:
-- Uses `gemini-3.8-flash` by default.
-- Reads either `GEMINI_API_KEY` or `GOOGLE_API_KEY`.
-- Passes `api_key` explicitly to comply with the latest langchain-google-genai / google-genai standards.
-- Sets explicit request timeouts and retry counts for resilience.
-"""
 from __future__ import annotations
 
 import logging
@@ -23,14 +14,6 @@ def get_gemini_llm(
     timeout: float = 45.0,
     max_retries: int = 2,
 ) -> ChatGoogleGenerativeAI:
-    """
-    Construct a ChatGoogleGenerativeAI client adhering to the latest Gemini API specs.
-
-    Args:
-        temperature: Sampling temperature (defaults to settings.llm_temperature).
-        timeout: HTTP request timeout in seconds.
-        max_retries: Maximum automatic retries on rate limits or transient errors.
-    """
     settings = get_settings()
     api_key = settings.effective_api_key
 

@@ -1,8 +1,3 @@
-"""
-app/schemas/documents.py
-─────────────────────────
-Response schema for GET /documents.
-"""
 from __future__ import annotations
 
 from typing import Optional

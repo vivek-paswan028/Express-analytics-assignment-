@@ -1,7 +1,5 @@
-# Secrets
 .env
 
-# Python
 __pycache__/
 *.py[cod]
 *.pyo
@@ -12,36 +10,28 @@ dist/
 build/
 .eggs/
 
-# Virtual environments
 venv/
 .venv/
 env/
 
-# Vector store (can be large; regenerated via ingest script)
 chroma_db/
 
-# HuggingFace model cache
 .cache/
 
-# Test artifacts
 .pytest_cache/
 htmlcov/
 .coverage
 coverage.xml
 
-# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# macOS
 .DS_Store
 
-# Logs
 *.log
 data/feedback.jsonl
 
-# Jupyter
 .ipynb_checkpoints/
 

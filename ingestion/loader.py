@@ -1,16 +1,3 @@
-"""
-ingestion/loader.py
-───────────────────
-Load documents from local files (.md, .txt, .html, .pdf) or remote URLs.
-Returns a list of LangChain Document objects with rich metadata.
-
-Design decisions:
-- We parse HTML/URLs ourselves with BeautifulSoup rather than using
-  langchain_community.document_loaders.WebBaseLoader to keep the dependency
-  surface small and control metadata extraction precisely.
-- PDF support via pypdf (already installed).
-- SSRF protection: URL fetching validates scheme and blocks private IP ranges.
-"""
 from __future__ import annotations
 
 import hashlib
@@ -27,33 +14,30 @@ from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
 
-# ── SSRF protection: block private / loopback IP ranges ──────────────────────
 _BLOCKED_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),
     ipaddress.ip_network("10.0.0.0/8"),
     ipaddress.ip_network("172.16.0.0/12"),
     ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("169.254.0.0/16"),  # link-local
+    ipaddress.ip_network("169.254.0.0/16"),
     ipaddress.ip_network("::1/128"),
     ipaddress.ip_network("fc00::/7"),
 ]
 
 _ALLOWED_SCHEMES = {"http", "https"}
-_FETCH_TIMEOUT = 15  # seconds
-_MAX_RESPONSE_BYTES = 10 * 1024 * 1024  # 10 MB
+_FETCH_TIMEOUT = 15
+_MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 
 
 def _is_private_host(hostname: str) -> bool:
-    """Return True if the hostname resolves to a private/loopback IP."""
     try:
         addr = ipaddress.ip_address(socket.gethostbyname(hostname))
     except (socket.gaierror, ValueError):
-        return True  # treat unresolvable hosts as unsafe
+        return True
     return any(addr in net for net in _BLOCKED_NETWORKS)
 
 
 def _validate_url(url: str) -> None:
-    """Raise ValueError if the URL is unsafe to fetch."""
     parsed = urlparse(url)
     if parsed.scheme not in _ALLOWED_SCHEMES:
         raise ValueError(f"URL scheme '{parsed.scheme}' is not allowed. Use http or https.")
@@ -64,7 +48,6 @@ def _validate_url(url: str) -> None:
 
 
 def _extract_heading_from_markdown(text: str) -> str:
-    """Return the first H1 or H2 heading found in the text."""
     for line in text.splitlines():
         line = line.strip()
         if line.startswith("# "):
@@ -75,12 +58,10 @@ def _extract_heading_from_markdown(text: str) -> str:
 
 
 def _chunk_hash(text: str) -> str:
-    """Short SHA-256 hash of text content for deduplication."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
 def _make_doc_id(source_name: str) -> str:
-    """Stable doc_id from source filename (without extension)."""
     stem = Path(source_name).stem.lower()
     stem = re.sub(r"[^a-z0-9_]", "_", stem)
     return f"doc_{stem}"
@@ -96,10 +77,7 @@ def _build_metadata(source_name: str, doc_id: str, extra: Optional[dict] = None)
     return base
 
 
-# ── Loaders ───────────────────────────────────────────────────────────────────
-
 def load_markdown(path: Path) -> list[Document]:
-    """Load a Markdown or plain-text file."""
     text = path.read_text(encoding="utf-8", errors="replace")
     if not text.strip():
         raise ValueError(f"File is empty: {path}")
@@ -111,16 +89,13 @@ def load_markdown(path: Path) -> list[Document]:
 
 
 def load_html(path: Path) -> list[Document]:
-    """Load an HTML file, extracting visible text with BeautifulSoup."""
     from bs4 import BeautifulSoup
 
     raw = path.read_text(encoding="utf-8", errors="replace")
     soup = BeautifulSoup(raw, "html.parser")
-    # Remove script and style elements
     for tag in soup(["script", "style", "head", "nav", "footer"]):
         tag.decompose()
     text = soup.get_text(separator="\n")
-    # Collapse excessive blank lines
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     if not text:
         raise ValueError(f"No text content extracted from HTML: {path}")
@@ -133,7 +108,6 @@ def load_html(path: Path) -> list[Document]:
 
 
 def load_pdf(path: Path) -> list[Document]:
-    """Load a PDF file using pypdf (page-by-page)."""
     import pypdf
 
     docs = []
@@ -153,11 +127,6 @@ def load_pdf(path: Path) -> list[Document]:
 
 
 def load_url(url: str) -> list[Document]:
-    """
-    Fetch a URL and return its content as a Document.
-    Supports HTML (parsed to text) and Markdown/plain-text responses.
-    Includes SSRF protection.
-    """
     _validate_url(url)
 
     parsed = urlparse(url)
@@ -170,7 +139,6 @@ def load_url(url: str) -> list[Document]:
     )
     response.raise_for_status()
 
-    # Read up to the size limit
     chunks = []
     total = 0
     for chunk in response.iter_content(chunk_size=65536):
@@ -194,7 +162,6 @@ def load_url(url: str) -> list[Document]:
         title_text = title.get_text(strip=True) if title else ""
         metadata = _build_metadata(source_name, doc_id, {"url": url, "title": title_text})
     else:
-        # Treat as plain text / Markdown
         text = content_bytes.decode("utf-8", errors="replace").strip()
         title = _extract_heading_from_markdown(text)
         metadata = _build_metadata(source_name, doc_id, {"url": url, "title": title})
@@ -207,7 +174,6 @@ def load_url(url: str) -> list[Document]:
 
 
 def load_file(path: Path) -> list[Document]:
-    """Dispatch to the correct loader based on file extension."""
     ext = path.suffix.lower()
     if ext in {".md", ".txt", ".rst"}:
         return load_markdown(path)
@@ -222,7 +188,6 @@ def load_file(path: Path) -> list[Document]:
 
 
 def load_corpus(corpus_dir: Path) -> list[Document]:
-    """Load all supported documents from a directory."""
     docs = []
     for path in sorted(corpus_dir.iterdir()):
         if path.is_file():

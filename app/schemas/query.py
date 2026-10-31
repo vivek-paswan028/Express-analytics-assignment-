@@ -1,8 +1,3 @@
-"""
-app/schemas/query.py
-─────────────────────
-Request and response schemas for POST /query.
-"""
 from __future__ import annotations
 
 from typing import Optional
@@ -10,7 +5,6 @@ from pydantic import BaseModel, Field
 
 
 class SourceMetadata(BaseModel):
-    """Citation reference for one retrieved chunk."""
     doc_id: str = Field(description="Stable document identifier")
     source: str = Field(description="Source filename or URL")
     chunk_id: str = Field(description="Unique chunk identifier within the document")

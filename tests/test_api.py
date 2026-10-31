@@ -1,9 +1,3 @@
-"""
-tests/test_api.py
-──────────────────
-FastAPI endpoint tests using TestClient.
-LLM calls and vector store are mocked so these tests run without API keys.
-"""
 from __future__ import annotations
 
 import json
@@ -17,7 +11,6 @@ from langchain_core.documents import Document
 
 
 def _make_mock_store(chunks=5, docs=None):
-    """Build a mock VectorStore."""
     mock = MagicMock()
     mock.get_total_chunks.return_value = chunks
     mock.list_documents.return_value = docs or [
@@ -41,7 +34,6 @@ def _make_mock_rag_result(
     retry_count=0,
     generation_supported=True,
 ):
-    """Build a mock RAG pipeline result dict."""
     default_sources = [
         {"doc_id": "doc_001", "source": "langgraph_concepts.md",
          "chunk_id": "doc_001_chunk_0001", "heading": "Nodes"}
@@ -63,7 +55,6 @@ def _make_mock_rag_result(
 
 @pytest.fixture
 def client():
-    """Create a TestClient with all dependencies mocked."""
     mock_store = _make_mock_store()
 
     with patch("ingestion.vector_store.init_vector_store", return_value=mock_store), \
@@ -98,8 +89,6 @@ def client():
             yield c
 
 
-# ── POST /query ───────────────────────────────────────────────────────────────
-
 class TestQueryEndpoint:
     def test_valid_question_returns_200(self, client):
         mock_result = _make_mock_rag_result()
@@ -128,14 +117,12 @@ class TestQueryEndpoint:
         assert response.status_code == 422
 
     def test_fallback_response_is_valid(self, client):
-        """Fallback (no relevant docs) still returns 200 with generation_supported=False."""
         mock_result = _make_mock_rag_result(
             answer="I could not find sufficient information...",
             sources=[],
             retry_count=2,
             generation_supported=False,
         )
-        # Override relevant_documents so the route reports 0 relevant chunks
         mock_result["relevant_documents"] = []
         with patch("app.routes.query.run_rag_pipeline", return_value=mock_result), \
              patch("app.routes.query.get_settings") as ms:
@@ -147,7 +134,6 @@ class TestQueryEndpoint:
         assert data["generation_supported"] is False
         assert data["sources"] == []
 
-# ── GET /documents ────────────────────────────────────────────────────────────
 
 class TestDocumentsEndpoint:
     def test_returns_document_list(self, client):
@@ -194,7 +180,6 @@ class TestDocumentsEndpoint:
         assert data["doc_id"] == "doc_test"
         assert data["deleted_chunks"] == 2
 
-# ── POST /feedback ────────────────────────────────────────────────────────────
 
 class TestFeedbackEndpoint:
     def test_thumbs_up_accepted(self, client):
@@ -228,13 +213,11 @@ class TestFeedbackEndpoint:
         assert response.status_code == 422
 
     def test_feedback_written_to_file(self, client):
-        """Feedback is appended to the JSONL log file."""
         import tempfile as _tf
         with _tf.NamedTemporaryFile(suffix=".jsonl", delete=False, mode="w") as f:
             tmp_path = Path(f.name)
 
         try:
-            # Patch the module-level settings object used inside the route
             import app.routes.feedback as feedback_module
             original_settings = feedback_module.settings
             mock_s = MagicMock()
@@ -260,22 +243,16 @@ class TestFeedbackEndpoint:
         tmp_path.unlink(missing_ok=True)
 
 
-# ── GET /health ───────────────────────────────────────────────────────────────
-
 class TestHealthEndpoint:
     def test_health_returns_ok(self, client):
         mock_store = _make_mock_store()
         with patch("app.main.get_vector_store", return_value=mock_store, create=True):
             response = client.get("/health")
-        # Health endpoint should always return 200
         assert response.status_code == 200
 
 
-# ── POST /ingest ──────────────────────────────────────────────────────────────
-
 class TestIngestEndpoint:
     def test_ingest_markdown_file(self, client):
-        """Upload a valid markdown file and verify it's ingested."""
         md_content = b"# Test Doc\n\nThis is test content for ingestion."
         mock_store = _make_mock_store()
 
@@ -296,18 +273,16 @@ class TestIngestEndpoint:
         assert "errors" in data
 
     def test_unsupported_file_type_returns_error(self, client):
-        """CSV files are not supported; error is in the errors list."""
         csv_content = b"a,b,c\n1,2,3"
         response = client.post(
             "/ingest",
             files=[("files", ("data.csv", csv_content, "text/csv"))],
         )
-        assert response.status_code == 200  # HTTP 200 with error in body
+        assert response.status_code == 200
         data = response.json()
         assert len(data["errors"]) > 0
         assert "Unsupported" in data["errors"][0]["error"]
 
     def test_invalid_url_returns_422(self, client):
-        """FTP URLs are rejected at validation."""
         response = client.post("/ingest/url", json={"urls": ["ftp://example.com/file.txt"]})
         assert response.status_code == 422

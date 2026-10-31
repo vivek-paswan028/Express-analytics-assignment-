@@ -1,21 +1,3 @@
-"""
-rag/nodes/query_analysis.py
-────────────────────────────
-Node 1 of the LangGraph RAG workflow.
-
-Responsibilities:
-1. On the FIRST pass (retry_count == 0):
-   - Classify the question type (conceptual, how-to, troubleshooting, api-reference).
-   - Rewrite/expand the query to improve retrieval quality.
-
-2. On RETRY passes (retry_count > 0):
-   - Produce a substantially different reformulation of the query.
-   - Use the retry number as a hint to try a broader or narrower angle.
-   - Increment retry_count in state.
-
-Structured output via Pydantic ensures the LLM returns valid JSON
-rather than free text, avoiding parsing failures.
-"""
 from __future__ import annotations
 
 import logging
@@ -35,7 +17,6 @@ settings = get_settings()
 
 
 class QueryAnalysisResult(BaseModel):
-    """Structured output from the query analysis LLM call."""
 
     query_type: Literal["conceptual", "how-to", "troubleshooting", "api-reference", "conversational", "unknown"] = Field(
         description="Classification of the user's question"
@@ -57,18 +38,10 @@ def _build_llm() -> ChatGoogleGenerativeAI:
 
 
 def query_analysis_node(state: RAGState) -> dict:
-    """
-    Analyse and rewrite the query for better retrieval.
-
-    On retry passes this node additionally increments retry_count,
-    and crafts a substantially different reformulation to surface
-    different chunks from the vector store.
-    """
     question = state["original_question"]
     retry_count = state.get("retry_count", 0)
     is_retry = retry_count > 0
 
-    # Fast path for conversational greetings
     normalized = question.strip().lower().rstrip("!?.")
     greetings = {
         "hi", "hii", "hiii", "hello", "hey", "heyy", "heyyy",
@@ -94,7 +67,6 @@ def query_analysis_node(state: RAGState) -> dict:
         structured_llm = llm.with_structured_output(QueryAnalysisResult)
 
         if is_retry:
-            # Retry prompt: ask for a different angle than the previous attempt
             previous_query = state.get("rewritten_query", question)
             system_msg = SystemMessage(content=(
                 "You are improving a search query for a technical documentation retrieval system. "
@@ -113,7 +85,6 @@ def query_analysis_node(state: RAGState) -> dict:
                 "Generate a different search query."
             ))
         else:
-            # First pass: classify and rewrite
             system_msg = SystemMessage(content=(
                 "You are a query analyser for a technical documentation assistant. "
                 "Given a user question, you must:\n"
@@ -140,7 +111,6 @@ def query_analysis_node(state: RAGState) -> dict:
             "rewritten_query": result.rewritten_query,
             "query_type": result.query_type,
         }
-        # Increment retry count on retries
         if is_retry:
             update["retry_count"] = retry_count + 1
 
@@ -148,7 +118,6 @@ def query_analysis_node(state: RAGState) -> dict:
 
     except Exception as e:
         logger.error("query_analysis_node failed: %s", e)
-        # Fallback: use original question as-is; don't crash the graph
         update = {
             "rewritten_query": question,
             "query_type": "unknown",

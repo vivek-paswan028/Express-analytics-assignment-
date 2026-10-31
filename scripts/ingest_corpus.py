@@ -1,22 +1,3 @@
-#!/usr/bin/env python3
-"""
-scripts/ingest_corpus.py
-─────────────────────────
-One-shot script to ingest all corpus documents into ChromaDB.
-
-Useful for:
-- Re-ingesting after deleting the chroma_db directory.
-- Verifying the ingestion pipeline before starting the API.
-- CI/CD pre-population of the vector store.
-
-Usage:
-    cd rag-docs-assistant
-    cp .env.example .env   # add your GOOGLE_API_KEY
-    python scripts/ingest_corpus.py
-
-Note: The API server also auto-ingests on startup if the collection is empty.
-This script is for standalone ingestion without starting the API.
-"""
 from __future__ import annotations
 
 import sys
@@ -42,7 +23,6 @@ def main():
     print(f"Chunk overlap:    {settings.chunk_overlap} chars")
     print()
 
-    # Load documents
     docs = load_corpus(CORPUS_DIR)
     if not docs:
         print("ERROR: No documents found in corpus directory.")
@@ -53,12 +33,10 @@ def main():
     for doc in docs:
         print(f"  - {doc.metadata.get('source', '?')} ({len(doc.page_content)} chars)")
 
-    # Chunk
     print()
     chunks = chunk_documents(docs, settings.chunk_size, settings.chunk_overlap)
     print(f"Split into {len(chunks)} chunks.")
 
-    # Embed and index
     print()
     print("Initialising vector store (embedding model may download on first run)...")
     store = init_vector_store(
@@ -75,7 +53,6 @@ def main():
     print(f"  Total chunks in store:     {store.get_total_chunks()}")
     print()
 
-    # Verify with a test query
     print("Verification — test retrieval query: 'conditional edge LangGraph'")
     test_results = store.similarity_search("conditional edge LangGraph", k=3)
     for i, doc in enumerate(test_results, 1):

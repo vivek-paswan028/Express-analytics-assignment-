@@ -1,19 +1,3 @@
-"""
-rag/nodes/generation.py
-────────────────────────
-Node 4 of the LangGraph RAG workflow.
-
-Generates the final answer using only the relevant, graded documents
-as context. Includes citations in a consistent format.
-
-Key constraints enforced in the prompt:
-1. Answer ONLY from the provided context — do not use pretrained knowledge.
-2. If context is incomplete, acknowledge uncertainty explicitly.
-3. Every factual claim must be attributable to a specific source chunk.
-
-Citation format: [Source N: filename — heading] inline in the answer,
-with a full source list appended at the end.
-"""
 from __future__ import annotations
 
 import logging
@@ -44,10 +28,6 @@ STRICT RULES:
 
 
 def _format_context(docs: list[Document]) -> tuple[str, list[SourceMetadata]]:
-    """
-    Format retrieved documents as numbered context sections.
-    Returns the formatted context string and the source metadata list.
-    """
     parts: list[str] = []
     sources: list[SourceMetadata] = []
 
@@ -72,19 +52,10 @@ def _format_context(docs: list[Document]) -> tuple[str, list[SourceMetadata]]:
 
 
 def generation_node(state: RAGState) -> dict:
-    """
-    Generate a grounded answer from the relevant documents.
-
-    Returns state updates with:
-    - answer: the generated answer string with inline citations
-    - sources: list of SourceMetadata for the chunks used
-    - generation_supported: True (we have relevant context)
-    """
     question = state["original_question"]
     relevant_docs = state.get("relevant_documents", [])
 
     if not relevant_docs:
-        # Should not reach here (routing prevents it), but handle defensively
         logger.warning("generation_node called with no relevant documents.")
         return {
             "answer": (
@@ -114,12 +85,10 @@ def generation_node(state: RAGState) -> dict:
             HumanMessage(content=human_content),
         ])
 
-        # Robustly extract string answer across LangChain / Gemini API versions
         raw_content = response.content
         if isinstance(raw_content, str):
             answer = raw_content.strip()
         elif isinstance(raw_content, list):
-            # Gemini 3+ returns list of blocks: [{'type': 'text', 'text': '...'}]
             parts = []
             for part in raw_content:
                 if isinstance(part, dict) and "text" in part:
@@ -141,7 +110,7 @@ def generation_node(state: RAGState) -> dict:
             "answer": answer,
             "sources": sources,
             "generation_supported": True,
-            "error": None,  # clear any previous error
+            "error": None,
         }
 
     except Exception as e:

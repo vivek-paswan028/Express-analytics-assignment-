@@ -1,8 +1,3 @@
-"""
-app/schemas/feedback.py
-────────────────────────
-Request and response schemas for POST /feedback.
-"""
 from __future__ import annotations
 
 from typing import Optional

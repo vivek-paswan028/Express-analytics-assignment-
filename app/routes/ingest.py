@@ -1,14 +1,3 @@
-"""
-app/routes/ingest.py
-─────────────────────
-POST /ingest — ingest new documents via file upload or URL.
-
-Security considerations implemented:
-- File size limit (max_upload_size_mb from config)
-- Extension allowlist (.md, .txt, .rst, .html, .htm, .pdf)
-- URL scheme validation and SSRF protection (in loader.py)
-- Errors per source are collected and returned without aborting the batch
-"""
 from __future__ import annotations
 
 import logging
@@ -35,13 +24,6 @@ _ALLOWED_EXTENSIONS = {".md", ".txt", ".rst", ".html", ".htm", ".pdf"}
 async def ingest_files(
     files: list[UploadFile] = File(..., description="One or more document files to ingest"),
 ) -> IngestResponse:
-    """
-    Upload and ingest one or more documents into the vector store.
-    Supported formats: .md, .txt, .rst, .html, .htm, .pdf
-
-    Duplicate chunks (same content as already-indexed chunks) are
-    automatically skipped.
-    """
     store = get_vector_store()
     results: list[IngestResult] = []
     errors: list[IngestError] = []
@@ -74,7 +56,6 @@ async def ingest_files(
                 errors.append(IngestError(source=filename, error="File is empty."))
                 continue
 
-            # Write to a temp file so loaders can use Path-based APIs
             with tempfile.NamedTemporaryFile(
                 suffix=ext, delete=False, prefix="upload_"
             ) as tmp:
@@ -84,7 +65,6 @@ async def ingest_files(
             try:
                 docs = load_file(tmp_path)
                 real_doc_id = _make_doc_id(filename)
-                # Restore original filename and derived doc_id in metadata
                 for doc in docs:
                     doc.metadata["source"] = filename
                     doc.metadata["doc_id"] = real_doc_id
@@ -121,13 +101,6 @@ async def ingest_files(
     summary="Ingest documents from URLs",
 )
 def ingest_urls(request: URLIngestRequest) -> IngestResponse:
-    """
-    Fetch and ingest documents from one or more URLs.
-    Supports HTML pages (text extracted) and Markdown/plain-text files.
-
-    SSRF protection: only http/https schemes are allowed; private and
-    loopback IP ranges are blocked.
-    """
     store = get_vector_store()
     results: list[IngestResult] = []
     errors: list[IngestError] = []
