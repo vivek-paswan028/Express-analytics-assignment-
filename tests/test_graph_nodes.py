@@ -295,7 +295,7 @@ class TestGradingNode:
         assert result["relevant_documents"] == []
 
     def test_grading_exception_falls_back_safely(self):
-        """When grading throws, node handles it gracefully without crashing."""
+        """When grading throws, node handles it gracefully by keeping retrieved chunks."""
         from rag.nodes.grading import grading_node
 
         broken_grader = MagicMock()
@@ -304,5 +304,5 @@ class TestGradingNode:
         doc = _make_doc("Some content")
         with patch("rag.nodes.grading.get_gemini_llm", return_value=broken_grader):
             result = grading_node(_make_state(retrieved_documents=[doc]))
-        assert "error" in result
+        assert len(result["relevant_documents"]) == 1
 

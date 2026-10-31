@@ -79,9 +79,9 @@ def grading_node(state: RAGState) -> dict:
             source = doc.metadata.get("source", "unknown")
             heading = doc.metadata.get("heading", "")
             location = f"{source} — {heading}" if heading else source
-            # Trim chunk preview to avoid token overflow
+            # Trim chunk preview to 500 chars to avoid token bloat and latency
             chunk_descriptions.append(
-                f"[Chunk {i}] (Source: {location})\n{doc.page_content[:1000]}"
+                f"[Chunk {i}] (Source: {location})\n{doc.page_content[:500]}"
             )
 
         human_prompt = (
@@ -114,9 +114,8 @@ def grading_node(state: RAGState) -> dict:
         return {"relevant_documents": relevant_docs}
 
     except Exception as e:
-        logger.warning("Batch grading failed: %s — falling back to keeping retrieved chunks", e)
-        # Fallback: keep all documents to avoid dropping context on grading API failure
+        logger.warning("Batch grading failed: %s — gracefully keeping retrieved chunks", e)
+        # Graceful fallback: preserve retrieved chunks so generation can still answer
         return {
             "relevant_documents": retrieved,
-            "error": f"Grading warning: {str(e)}",
         }
