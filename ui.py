@@ -72,7 +72,7 @@ def submit_query(question: str, top_k: int = 5):
     res = requests.post(
         f"{API_BASE_URL}/query",
         json={"question": question, "top_k": top_k},
-        timeout=60,
+        timeout=120,
     )
     try:
         data = res.json()

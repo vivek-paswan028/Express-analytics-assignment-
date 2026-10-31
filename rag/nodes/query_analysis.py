@@ -37,7 +37,7 @@ settings = get_settings()
 class QueryAnalysisResult(BaseModel):
     """Structured output from the query analysis LLM call."""
 
-    query_type: Literal["conceptual", "how-to", "troubleshooting", "api-reference", "unknown"] = Field(
+    query_type: Literal["conceptual", "how-to", "troubleshooting", "api-reference", "conversational", "unknown"] = Field(
         description="Classification of the user's question"
     )
     rewritten_query: str = Field(
@@ -67,6 +67,16 @@ def query_analysis_node(state: RAGState) -> dict:
     question = state["original_question"]
     retry_count = state.get("retry_count", 0)
     is_retry = retry_count > 0
+
+    # Fast path for conversational greetings
+    normalized = question.strip().lower()
+    greetings = {"hi", "hii", "hello", "hey", "heyy", "good morning", "good evening", "thanks", "thank you", "help"}
+    if normalized in greetings:
+        logger.info("Fast path: detected conversational greeting '%s'", normalized)
+        return {
+            "query_type": "conversational",
+            "rewritten_query": question,
+        }
 
     try:
         llm = _build_llm()

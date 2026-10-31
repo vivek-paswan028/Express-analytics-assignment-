@@ -49,6 +49,11 @@ def route_after_grading(state: RAGState) -> str:
         )
         return "generate"
 
+    # Conversational greetings skip retry cycles
+    if state.get("query_type") == "conversational":
+        logger.info("Routing: conversational query → fallback")
+        return "fallback"
+
     retry_count = state.get("retry_count", 0)
     max_retries = state.get("max_retries", 2)
 

@@ -36,16 +36,28 @@ _SYSTEM_ERROR_MESSAGE = (
 )
 
 
+_GREETING_MESSAGE = (
+    "Hello! 👋 I am your Technical Documentation Assistant.\n\n"
+    "I am grounded in the technical documentation you index. "
+    "You can ask me questions about your documentation (e.g. LangGraph, FastAPI, ChromaDB), "
+    "or upload new guides using the **📁 Manage & Ingest Documents** tab in the sidebar!"
+)
+
+
 def fallback_node(state: RAGState) -> dict:
     """
-    Return a structured "I don't know" or error response.
-
-    Distinguishes between two scenarios:
-    - error in state → system failure message
-    - no error → simply no relevant context found after retries
+    Return a structured response when no relevant context is retrieved or on errors.
     """
     error = state.get("error")
     retry_count = state.get("retry_count", 0)
+
+    # Conversational greeting
+    if state.get("query_type") == "conversational":
+        return {
+            "answer": _GREETING_MESSAGE,
+            "sources": [],
+            "generation_supported": True,
+        }
 
     if error:
         # System error (LLM/retrieval failure)

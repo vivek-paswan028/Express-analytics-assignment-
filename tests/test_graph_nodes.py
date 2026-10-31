@@ -238,20 +238,21 @@ class TestQueryAnalysisNode:
 class TestGradingNode:
     def test_filters_irrelevant_documents(self):
         """Documents graded irrelevant are excluded from relevant_documents."""
-        from rag.nodes.grading import grading_node, DocumentGrade
+        from rag.nodes.grading import grading_node, BatchGradingResult, ChunkEvaluation
 
         relevant_doc = _make_doc("LangGraph StateGraph has nodes and edges.", "langgraph.md")
         irrelevant_doc = _make_doc("Python lists are sequences of items.", "python.md", "chunk_002")
 
-        def mock_invoke(messages):
-            content = messages[-1].content
-            if "nodes and edges" in content:
-                return DocumentGrade(score="relevant", reasoning="On topic.")
-            return DocumentGrade(score="irrelevant", reasoning="Off topic.")
+        mock_eval = BatchGradingResult(
+            evaluations=[
+                ChunkEvaluation(chunk_index=0, score="relevant", reasoning="On topic"),
+                ChunkEvaluation(chunk_index=1, score="irrelevant", reasoning="Off topic"),
+            ]
+        )
 
         with patch("rag.nodes.grading.get_gemini_llm") as mock_get_llm:
             mock_llm = MagicMock()
-            mock_llm.with_structured_output.return_value.invoke = mock_invoke
+            mock_llm.with_structured_output.return_value.invoke.return_value = mock_eval
             mock_get_llm.return_value = mock_llm
 
             state = _make_state(
@@ -269,14 +270,15 @@ class TestGradingNode:
         result = grading_node(state)
         assert result["relevant_documents"] == []
 
-    def test_grading_exception_defaults_to_irrelevant(self):
-        """Per-document grading failures default to irrelevant (conservative)."""
-        from rag.nodes.grading import _grade_single_document
+    def test_grading_exception_falls_back_safely(self):
+        """When grading throws, node handles it gracefully without crashing."""
+        from rag.nodes.grading import grading_node
 
         broken_grader = MagicMock()
-        broken_grader.invoke.side_effect = Exception("timeout")
+        broken_grader.with_structured_output.return_value.invoke.side_effect = Exception("timeout")
 
         doc = _make_doc("Some content")
-        result = _grade_single_document(broken_grader, "some question", doc)
-        assert result is False  # conservative: irrelevant
+        with patch("rag.nodes.grading.get_gemini_llm", return_value=broken_grader):
+            result = grading_node(_make_state(retrieved_documents=[doc]))
+        assert "error" in result
 
