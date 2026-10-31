@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 def get_gemini_llm(
     temperature: Optional[float] = None,
-    timeout: float = 45.0,
-    max_retries: int = 2,
+    timeout: float = 20.0,
+    max_retries: int = 1,
 ) -> ChatGoogleGenerativeAI:
     settings = get_settings()
     api_key = settings.effective_api_key

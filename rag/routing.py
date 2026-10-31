@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 def route_after_query_analysis(state: RAGState) -> str:
-    if state.get("query_type") == "conversational":
-        logger.info("Routing after analysis: conversational greeting detected → fallback")
+    if state.get("query_type") == "greeting":
+        logger.info("Routing after analysis: greeting detected → fallback")
         return "fallback"
     return "retrieval"
 
@@ -28,8 +28,8 @@ def route_after_grading(state: RAGState) -> str:
         )
         return "generate"
 
-    if state.get("query_type") == "conversational":
-        logger.info("Routing: conversational query → fallback")
+    if state.get("query_type") == "greeting":
+        logger.info("Routing: pure greeting query → fallback")
         return "fallback"
 
     retry_count = state.get("retry_count", 0)

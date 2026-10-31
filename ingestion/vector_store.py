@@ -157,6 +157,13 @@ class VectorStore:
         result = self._collection.get(where={"doc_id": doc_id}, limit=1)
         return bool(result.get("ids"))
 
+    def get_chunks_by_document(self, doc_id: str) -> list[Document]:
+        res = self._collection.get(where={"doc_id": doc_id}, include=["documents", "metadatas"])
+        docs = []
+        for text, meta in zip(res.get("documents") or [], res.get("metadatas") or []):
+            docs.append(Document(page_content=text, metadata=meta or {}))
+        return sorted(docs, key=lambda d: int(d.metadata.get("chunk_index", 0)))
+
     def clear_all_documents(self) -> int:
         count = self._collection.count()
         if count > 0:

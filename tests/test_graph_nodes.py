@@ -40,10 +40,15 @@ def _make_doc(content: str, source: str = "test.md", chunk_id: str = "chunk_001"
 
 
 class TestRouting:
-    def test_routes_to_fallback_for_conversational_query_analysis(self):
+    def test_routes_to_fallback_for_greeting_query_analysis(self):
+        from rag.routing import route_after_query_analysis
+        state = _make_state(query_type="greeting")
+        assert route_after_query_analysis(state) == "fallback"
+
+    def test_routes_to_retrieval_for_conversational_query_analysis(self):
         from rag.routing import route_after_query_analysis
         state = _make_state(query_type="conversational")
-        assert route_after_query_analysis(state) == "fallback"
+        assert route_after_query_analysis(state) == "retrieval"
 
     def test_routes_to_retrieval_for_technical_query_analysis(self):
         from rag.routing import route_after_query_analysis
@@ -85,10 +90,32 @@ class TestRouting:
 
 
 class TestFallbackNode:
-    def test_fallback_no_error(self):
+    def test_fallback_greeting(self):
         from rag.nodes.fallback import fallback_node
-        state = _make_state(retry_count=2)
+        state = _make_state(query_type="greeting")
         result = fallback_node(state)
+        assert result["generation_supported"] is True
+        assert "Technical Documentation Assistant" in result["answer"]
+
+    def test_fallback_generates_general_knowledge(self):
+        from rag.nodes.fallback import fallback_node
+        state = _make_state(retry_count=2, original_question="What is quantum computing?")
+        mock_res = MagicMock()
+        mock_res.content = "Quantum computing uses qubits."
+        with patch("rag.nodes.fallback.get_gemini_llm") as mock_llm:
+            mock_llm.return_value.invoke.return_value = mock_res
+            result = fallback_node(state)
+        assert result["generation_supported"] is True
+        assert "Quantum computing uses qubits" in result["answer"]
+        assert len(result["sources"]) == 1
+        assert "General AI Knowledge" in result["sources"][0]["source"]
+
+    def test_fallback_llm_failure_returns_no_context(self):
+        from rag.nodes.fallback import fallback_node
+        state = _make_state(retry_count=2, original_question="What is quantum computing?")
+        with patch("rag.nodes.fallback.get_gemini_llm") as mock_llm:
+            mock_llm.return_value.invoke.side_effect = Exception("API offline")
+            result = fallback_node(state)
         assert result["generation_supported"] is False
         assert result["sources"] == []
         assert "could not find" in result["answer"].lower()
@@ -165,7 +192,7 @@ class TestQueryAnalysisNode:
             reasoning="Test reasoning.",
         )
 
-    def test_conversational_greeting_fast_path(self):
+    def test_pure_greeting_fast_path(self):
         from rag.nodes.query_analysis import query_analysis_node
 
         with patch("rag.nodes.query_analysis.get_gemini_llm") as mock_get_llm:
@@ -175,7 +202,7 @@ class TestQueryAnalysisNode:
             ))
             mock_get_llm.assert_not_called()
 
-        assert result["query_type"] == "conversational"
+        assert result["query_type"] == "greeting"
         assert result["rewritten_query"] == "hii"
 
     def test_first_pass_sets_rewritten_query(self):
