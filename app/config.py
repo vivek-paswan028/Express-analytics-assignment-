@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # ── LLM (supports latest Google Gemini API: GEMINI_API_KEY or GOOGLE_API_KEY)
     google_api_key: str = ""
     gemini_api_key: str = ""
-    llm_model: str = "gemini-2.0-flash"
+    llm_model: str = "gemini-2.5-flash"
     llm_temperature: float = 0.0
 
     # ── Embeddings ───────────────────────────────────────────────────

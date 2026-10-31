@@ -109,7 +109,7 @@ def route_after_grading(state: RAGState) -> str:
 | Component | Technology | Rationale & Trade-offs |
 |---|---|---|
 | **Graph Framework** | LangGraph `StateGraph` (v1.1.9) | State-machine based orchestration supporting cycles, conditional routing, and deterministic state transitions. Avoids brittle sequential function scripts. |
-| **LLM Provider** | Google Gemini 2.0 Flash (`gemini-2.0-flash`) | Fast inference, generous free tier, and native support for Pydantic structured output (`.with_structured_output()`) for reliable document grading. |
+| **LLM Provider** | Google Gemini 2.5 Flash (`gemini-2.5-flash`) | Fast inference, generous free tier, and native support for Pydantic structured output (`.with_structured_output()`) for reliable document grading. |
 | **Embeddings** | `sentence-transformers/all-MiniLM-L6-v2` | Runs locally via CPU; zero API cost, zero external network dependency during retrieval, and 384-dimensional dense vectors optimal for technical prose. |
 | **Vector Store** | ChromaDB (v1.5.8) | Persistent on disk (`./chroma_db`), native metadata filtering, and built-in listing capabilities needed for the `GET /documents` endpoint. |
 | **Web API** | FastAPI (v0.115.0) + Uvicorn | High performance ASGI framework with automatic OpenAPI documentation (`/docs`), Pydantic v2 data validation, and async file upload handling. |
@@ -167,7 +167,7 @@ cp .env.example .env
 Edit `.env`:
 ```env
 GOOGLE_API_KEY=AIzaSy...your_actual_key...
-LLM_MODEL=gemini-2.0-flash
+LLM_MODEL=gemini-2.5-flash
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 RETRIEVAL_TOP_K=5
 MAX_RETRIES=2

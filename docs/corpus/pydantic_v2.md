@@ -179,7 +179,7 @@ class Settings(BaseSettings):
     )
 
     google_api_key: str = ""
-    llm_model: str = "gemini-2.0-flash"
+    llm_model: str = "gemini-2.5-flash"
     retrieval_top_k: int = 5
 
 settings = Settings()

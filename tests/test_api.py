@@ -74,7 +74,7 @@ def client():
 
         mock_settings = MagicMock()
         mock_settings.has_llm_key = True
-        mock_settings.llm_model = "gemini-2.0-flash"
+        mock_settings.llm_model = "gemini-2.5-flash"
         mock_settings.llm_temperature = 0.0
         mock_settings.google_api_key = "test_key"
         mock_settings.chroma_persist_dir = "/tmp/test_chroma"
