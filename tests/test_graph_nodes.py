@@ -306,3 +306,48 @@ class TestGradingNode:
             result = grading_node(_make_state(retrieved_documents=[doc]))
         assert len(result["relevant_documents"]) == 1
 
+
+# ── Generation node tests ───────────────────────────────────────────────────
+
+class TestGenerationNode:
+    def test_generation_with_string_content(self):
+        from rag.nodes.generation import generation_node
+        doc = _make_doc("FastAPI route parameters")
+        state = _make_state(
+            relevant_documents=[doc],
+            original_question="How to define route?",
+        )
+        mock_response = MagicMock()
+        mock_response.content = "FastAPI uses decorators [Source 1]."
+
+        with patch("rag.nodes.generation.get_gemini_llm") as mock_get_llm:
+            mock_llm = MagicMock()
+            mock_llm.invoke.return_value = mock_response
+            mock_get_llm.return_value = mock_llm
+            result = generation_node(state)
+
+        assert result["generation_supported"] is True
+        assert "FastAPI uses decorators" in result["answer"]
+        assert len(result["sources"]) == 1
+
+    def test_generation_with_multimodal_list_content(self):
+        """Supports Gemini 3 list-of-dicts content response."""
+        from rag.nodes.generation import generation_node
+        doc = _make_doc("FastAPI route parameters")
+        state = _make_state(
+            relevant_documents=[doc],
+            original_question="How to define route?",
+        )
+        mock_response = MagicMock()
+        mock_response.content = [{"type": "text", "text": "FastAPI uses decorators [Source 1]."}]
+
+        with patch("rag.nodes.generation.get_gemini_llm") as mock_get_llm:
+            mock_llm = MagicMock()
+            mock_llm.invoke.return_value = mock_response
+            mock_get_llm.return_value = mock_llm
+            result = generation_node(state)
+
+        assert result["generation_supported"] is True
+        assert "FastAPI uses decorators" in result["answer"]
+        assert len(result["sources"]) == 1
+

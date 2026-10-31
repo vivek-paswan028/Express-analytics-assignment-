@@ -2,7 +2,7 @@
 rag/llm.py
 ──────────
 Factory for Google Gemini language models using the latest Google GenAI specifications:
-- Uses `gemini-2.5-flash` by default.
+- Uses `gemini-3.8-flash` by default.
 - Reads either `GEMINI_API_KEY` or `GOOGLE_API_KEY`.
 - Passes `api_key` explicitly to comply with the latest langchain-google-genai / google-genai standards.
 - Sets explicit request timeouts and retry counts for resilience.

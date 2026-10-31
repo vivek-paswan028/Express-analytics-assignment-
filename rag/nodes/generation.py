@@ -114,7 +114,23 @@ def generation_node(state: RAGState) -> dict:
             HumanMessage(content=human_content),
         ])
 
-        answer = response.content.strip()
+        # Robustly extract string answer across LangChain / Gemini API versions
+        raw_content = response.content
+        if isinstance(raw_content, str):
+            answer = raw_content.strip()
+        elif isinstance(raw_content, list):
+            # Gemini 3+ returns list of blocks: [{'type': 'text', 'text': '...'}]
+            parts = []
+            for part in raw_content:
+                if isinstance(part, dict) and "text" in part:
+                    parts.append(part["text"])
+                elif isinstance(part, str):
+                    parts.append(part)
+                elif hasattr(part, "text"):
+                    parts.append(str(part.text))
+            answer = "".join(parts).strip()
+        else:
+            answer = str(raw_content).strip()
 
         logger.info(
             "Generation complete: %d chars, %d sources cited",
