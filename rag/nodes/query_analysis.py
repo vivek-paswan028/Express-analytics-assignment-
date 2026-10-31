@@ -69,9 +69,20 @@ def query_analysis_node(state: RAGState) -> dict:
     is_retry = retry_count > 0
 
     # Fast path for conversational greetings
-    normalized = question.strip().lower()
-    greetings = {"hi", "hii", "hello", "hey", "heyy", "good morning", "good evening", "thanks", "thank you", "help"}
-    if normalized in greetings:
+    normalized = question.strip().lower().rstrip("!?.")
+    greetings = {
+        "hi", "hii", "hiii", "hello", "hey", "heyy", "heyyy",
+        "good morning", "good evening", "good afternoon",
+        "thanks", "thank you", "help", "who are you", "what can you do",
+        "howdy", "sup", "yo", "greeting", "greetings"
+    }
+    tokens = normalized.split()
+    tech_keywords = {"langgraph", "fastapi", "chroma", "chromadb", "pydantic", "langchain", "rag", "vector", "embedding", "chunk", "python"}
+    is_greeting = (
+        normalized in greetings
+        or (len(tokens) <= 3 and any(t in greetings for t in tokens) and not any(t in tech_keywords for t in tokens))
+    )
+    if is_greeting:
         logger.info("Fast path: detected conversational greeting '%s'", normalized)
         return {
             "query_type": "conversational",

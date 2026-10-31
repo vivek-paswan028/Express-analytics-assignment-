@@ -49,6 +49,16 @@ def _make_doc(content: str, source: str = "test.md", chunk_id: str = "chunk_001"
 # ── Routing tests (pure functions, no mocking needed) ─────────────────────────
 
 class TestRouting:
+    def test_routes_to_fallback_for_conversational_query_analysis(self):
+        from rag.routing import route_after_query_analysis
+        state = _make_state(query_type="conversational")
+        assert route_after_query_analysis(state) == "fallback"
+
+    def test_routes_to_retrieval_for_technical_query_analysis(self):
+        from rag.routing import route_after_query_analysis
+        state = _make_state(query_type="conceptual")
+        assert route_after_query_analysis(state) == "retrieval"
+
     def test_routes_to_generate_when_relevant_docs(self):
         from rag.routing import route_after_grading
         state = _make_state(relevant_documents=[_make_doc("relevant content")])
@@ -172,6 +182,20 @@ class TestQueryAnalysisNode:
             rewritten_query=rewritten,
             reasoning="Test reasoning.",
         )
+
+    def test_conversational_greeting_fast_path(self):
+        """Conversational greetings are detected without calling the LLM."""
+        from rag.nodes.query_analysis import query_analysis_node
+
+        with patch("rag.nodes.query_analysis.get_gemini_llm") as mock_get_llm:
+            result = query_analysis_node(_make_state(
+                original_question="hii",
+                retry_count=0,
+            ))
+            mock_get_llm.assert_not_called()
+
+        assert result["query_type"] == "conversational"
+        assert result["rewritten_query"] == "hii"
 
     def test_first_pass_sets_rewritten_query(self):
         from rag.nodes.query_analysis import query_analysis_node

@@ -24,6 +24,20 @@ from rag.state import RAGState
 logger = logging.getLogger(__name__)
 
 
+def route_after_query_analysis(state: RAGState) -> str:
+    """
+    Decide what to do immediately after query analysis.
+
+    If the question is recognized as a conversational greeting or meta-question,
+    skip retrieval and grading entirely and route straight to fallback (which provides
+    the assistant greeting). Otherwise proceed to vector retrieval.
+    """
+    if state.get("query_type") == "conversational":
+        logger.info("Routing after analysis: conversational greeting detected → fallback")
+        return "fallback"
+    return "retrieval"
+
+
 def route_after_grading(state: RAGState) -> str:
     """
     Decide what to do after document grading.

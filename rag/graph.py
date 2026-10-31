@@ -35,7 +35,7 @@ from rag.nodes.generation import generation_node
 from rag.nodes.grading import grading_node
 from rag.nodes.query_analysis import query_analysis_node
 from rag.nodes.retrieval import retrieval_node
-from rag.routing import route_after_grading
+from rag.routing import route_after_grading, route_after_query_analysis
 from rag.state import RAGState
 
 logger = logging.getLogger(__name__)
@@ -58,9 +58,18 @@ def build_graph() -> object:
     builder.add_node("generate", generation_node)
     builder.add_node("fallback", fallback_node)
 
-    # ── Static edges (unconditional) ──────────────────────────────────────
+    # ── Static edges & conditional fast path ──────────────────────────────
     builder.add_edge(START, "query_analysis")
-    builder.add_edge("query_analysis", "retrieval")
+
+    # Conditional edge after query analysis: conversational queries skip retrieval
+    builder.add_conditional_edges(
+        "query_analysis",
+        route_after_query_analysis,
+        {
+            "retrieval": "retrieval",
+            "fallback": "fallback",
+        },
+    )
     builder.add_edge("retrieval", "grading")
 
     # ── Conditional edge after grading ─────────────────────────────────────
