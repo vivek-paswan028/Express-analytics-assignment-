@@ -37,12 +37,21 @@ def get_embedding_model(model_name: str = "all-MiniLM-L6-v2") -> HuggingFaceEmbe
     even if get_embedding_model() is called from multiple modules.
     First call triggers a model download if not cached locally (~90 MB).
     """
-    logger.info("Loading embedding model: %s (may download on first run)", model_name)
-    model = HuggingFaceEmbeddings(
-        model_name=model_name,
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True},  # cosine similarity friendly
-    )
+    logger.info("Loading embedding model: %s", model_name)
+    try:
+        # Prefer fast loading from local cache without network checks
+        model = HuggingFaceEmbeddings(
+            model_name=model_name,
+            model_kwargs={"device": "cpu", "local_files_only": True},
+            encode_kwargs={"normalize_embeddings": True},  # cosine similarity friendly
+        )
+    except Exception:
+        # Fall back to online fetch if model is not yet in local cache
+        model = HuggingFaceEmbeddings(
+            model_name=model_name,
+            model_kwargs={"device": "cpu"},
+            encode_kwargs={"normalize_embeddings": True},
+        )
     logger.info("Embedding model loaded: %s", model_name)
     return model
 

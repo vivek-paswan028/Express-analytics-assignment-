@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.schemas.ingest import IngestError, IngestResponse, IngestResult, URLIngestRequest
 from ingestion.chunker import chunk_documents
-from ingestion.loader import load_file, load_url
+from ingestion.loader import _make_doc_id, load_file, load_url
 from ingestion.vector_store import get_vector_store
 
 router = APIRouter()
@@ -83,9 +83,11 @@ async def ingest_files(
 
             try:
                 docs = load_file(tmp_path)
-                # Restore original filename in metadata
+                real_doc_id = _make_doc_id(filename)
+                # Restore original filename and derived doc_id in metadata
                 for doc in docs:
                     doc.metadata["source"] = filename
+                    doc.metadata["doc_id"] = real_doc_id
             finally:
                 tmp_path.unlink(missing_ok=True)
 

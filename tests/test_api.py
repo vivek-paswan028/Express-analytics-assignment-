@@ -173,6 +173,27 @@ class TestDocumentsEndpoint:
         assert data["total_chunks"] == 0
         assert data["documents"] == []
 
+    def test_clear_all_documents_endpoint(self, client):
+        mock_store = MagicMock()
+        mock_store.clear_all_documents.return_value = 5
+        with patch("app.routes.documents.get_vector_store", return_value=mock_store):
+            response = client.delete("/documents")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["deleted_chunks"] == 5
+
+    def test_delete_single_document_endpoint(self, client):
+        mock_store = MagicMock()
+        mock_store.delete_document.return_value = 2
+        with patch("app.routes.documents.get_vector_store", return_value=mock_store):
+            response = client.delete("/documents/doc_test")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["doc_id"] == "doc_test"
+        assert data["deleted_chunks"] == 2
+
 # ── POST /feedback ────────────────────────────────────────────────────────────
 
 class TestFeedbackEndpoint:

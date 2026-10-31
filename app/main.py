@@ -59,13 +59,13 @@ async def lifespan(app: FastAPI):
         embedding_model_name=settings.embedding_model,
     )
 
-    # Auto-ingest corpus if the collection is empty
-    if store.get_total_chunks() == 0:
-        logger.info("Vector store is empty — ingesting corpus from %s", CORPUS_DIR)
+    # Auto-ingest corpus only if explicitly configured (defaults to False for clean slate)
+    if settings.auto_ingest_corpus and store.get_total_chunks() == 0:
+        logger.info("Auto-ingest enabled: ingesting corpus from %s", CORPUS_DIR)
         _ingest_corpus(store)
     else:
         logger.info(
-            "Vector store already populated: %d chunks across %d documents",
+            "Vector store ready: %d chunks across %d documents",
             store.get_total_chunks(),
             len(store.list_documents()),
         )

@@ -197,6 +197,17 @@ class VectorStore:
         result = self._collection.get(where={"doc_id": doc_id}, limit=1)
         return bool(result.get("ids"))
 
+    def clear_all_documents(self) -> int:
+        """Clear all documents from the collection. Returns count of deleted chunks."""
+        count = self._collection.count()
+        if count > 0:
+            all_items = self._collection.get()
+            all_ids = all_items.get("ids", [])
+            if all_ids:
+                self._collection.delete(ids=all_ids)
+        logger.info("Cleared all %d documents from collection '%s'", count, self._collection_name)
+        return count
+
     def delete_document(self, doc_id: str) -> int:
         """Delete all chunks for a given doc_id. Returns count deleted."""
         existing = self._collection.get(where={"doc_id": doc_id})
@@ -212,12 +223,16 @@ _store_instance: Optional[VectorStore] = None
 
 
 def get_vector_store() -> VectorStore:
-    """Return the global VectorStore singleton."""
+    """Return the global VectorStore singleton, auto-initialising if not yet set."""
     global _store_instance
     if _store_instance is None:
-        raise RuntimeError(
-            "VectorStore has not been initialised. "
-            "Call init_vector_store() during application startup."
+        from app.config import get_settings
+        settings = get_settings()
+        logger.info("Auto-initialising VectorStore singleton on demand...")
+        _store_instance = VectorStore(
+            persist_dir=settings.chroma_persist_dir,
+            collection_name=settings.chroma_collection_name,
+            embedding_model_name=settings.embedding_model,
         )
     return _store_instance
 

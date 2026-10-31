@@ -2,13 +2,9 @@
 ui.py
 ─────
 Interactive Streamlit frontend for the RAG Technical Documentation Assistant.
-Communicates with the FastAPI backend via standard REST endpoints:
-  - POST /query     -> Ask questions with self-corrective LangGraph pipeline
-  - GET  /documents -> List indexed corpus documents
-  - POST /ingest    -> Upload local files (.md, .txt, .html, .pdf)
-  - POST /ingest/url-> Ingest from URL with SSRF protection
-  - POST /feedback  -> Thumbs up / down feedback submission
-  - GET  /health    -> Live status check
+Features:
+  - Tab 1: 💬 Q&A Chat Assistant with pipeline trace & citations
+  - Tab 2: 📁 Document Management (Upload files, Ingest from URL, View catalog, Clear database)
 """
 from __future__ import annotations
 
@@ -48,6 +44,22 @@ def fetch_documents():
     return []
 
 
+def clear_all_documents():
+    try:
+        res = requests.delete(f"{API_BASE_URL}/documents", timeout=10)
+        return res.status_code == 200
+    except Exception:
+        return False
+
+
+def delete_single_document(doc_id: str):
+    try:
+        res = requests.delete(f"{API_BASE_URL}/documents/{doc_id}", timeout=10)
+        return res.status_code == 200
+    except Exception:
+        return False
+
+
 def submit_query(question: str, top_k: int = 5):
     res = requests.post(
         f"{API_BASE_URL}/query",
@@ -62,12 +74,15 @@ def submit_query(question: str, top_k: int = 5):
 
 
 def submit_feedback(rating: str, comment: str, question: str):
-    res = requests.post(
-        f"{API_BASE_URL}/feedback",
-        json={"rating": rating, "comment": comment, "question": question},
-        timeout=10,
-    )
-    return res.status_code == 200
+    try:
+        res = requests.post(
+            f"{API_BASE_URL}/feedback",
+            json={"rating": rating, "comment": comment, "question": question},
+            timeout=10,
+        )
+        return res.status_code == 200
+    except Exception:
+        return False
 
 
 def upload_files(files):
@@ -89,9 +104,9 @@ def ingest_url(url: str):
     raise RuntimeError(res.json().get("detail", res.text))
 
 
-# ── Sidebar: Knowledge Base & Management ─────────────────────────────────────
+# ── Sidebar: System Health & Quick Controls ──────────────────────────────────
 with st.sidebar:
-    st.title("⚙️ System Control")
+    st.title("⚙️ System Status")
     health = fetch_health()
 
     if health:
@@ -105,148 +120,226 @@ with st.sidebar:
         st.error(f"🔴 **FastAPI Offline**\nCannot connect to `{API_BASE_URL}`.\nRun: `uvicorn app.main:app --reload`")
 
     st.markdown("---")
-    st.subheader("📚 Indexed Documents")
+    st.subheader("📚 Quick Document List")
     docs = fetch_documents()
     if docs:
         for d in docs:
-            st.markdown(f"- **{d['source']}**  \n  `{d['chunks']} chunks` | `{d['doc_id']}`")
+            st.markdown(f"• **{d['source']}**  \n  `{d['chunks']} chunks` (`{d['doc_id']}`)")
+        st.markdown("")
+        if st.button("🗑️ Clear All Documents", type="secondary", use_container_width=True):
+            if clear_all_documents():
+                st.toast("Cleared all documents from vector store!", icon="🗑️")
+                st.rerun()
+            else:
+                st.error("Failed to clear documents.")
     else:
-        st.info("No documents currently indexed.")
+        st.info("No documents currently indexed. Go to the **Manage Documents** tab to upload.")
+
+
+# ── Main Content Area: Tabs ──────────────────────────────────────────────────
+st.title("🤖 Technical Documentation Assistant")
+st.caption("Self-corrective RAG with LangGraph, ChromaDB, and FastAPI")
+
+tab_chat, tab_docs = st.tabs(["💬 Ask Questions (Chat)", "📁 Manage Documents & Ingestion"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 1: Chat Q&A
+# ─────────────────────────────────────────────────────────────────────────────
+with tab_chat:
+    # Initialize Chat History
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Sample Questions
+    st.markdown("**Suggested Questions:**")
+    sample_cols = st.columns(4)
+    sample_prompts = [
+        "How do I add a conditional edge in LangGraph?",
+        "What is a StateGraph and how do nodes work?",
+        "How does ChromaDB persist embeddings to disk?",
+        "Explain quantum entanglement in physics.",
+    ]
+
+    selected_prompt = None
+    for i, prompt in enumerate(sample_prompts):
+        with sample_cols[i]:
+            if st.button(prompt, key=f"sample_{i}", use_container_width=True):
+                selected_prompt = prompt
 
     st.markdown("---")
-    st.subheader("📥 Ingestion Tools")
 
-    # File uploader tab
-    with st.expander("Upload Local Files"):
+    # Render Chat History
+    for idx, message in enumerate(st.session_state.messages):
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+            if message["role"] == "assistant" and "metadata" in message:
+                meta = message["metadata"]
+
+                # Expandable pipeline trace
+                with st.expander("🔍 Pipeline Trace & Citations"):
+                    col_a, col_b, col_c = st.columns(3)
+                    with col_a:
+                        st.caption(f"**Query Type:** `{meta.get('query_type')}`")
+                    with col_b:
+                        st.caption(f"**Retries Used:** `{meta.get('retry_count')}`")
+                    with col_c:
+                        status = "✅ Grounded" if meta.get("generation_supported") else "⚠️ Fallback"
+                        st.caption(f"**Status:** {status}")
+
+                    st.markdown(f"**Rewritten Query:** `{meta.get('rewritten_query')}`")
+
+                    sources = meta.get("sources", [])
+                    if sources:
+                        st.markdown("**Citations:**")
+                        for s in sources:
+                            heading = f" — *{s['heading']}*" if s.get("heading") else ""
+                            st.markdown(f"- 📄 `{s['source']}`{heading} (`{s['chunk_id']}`)")
+                    else:
+                        st.info("No source chunks utilized (fallback path triggered).")
+
+                # Feedback widget
+                if f"feedback_{idx}" not in st.session_state:
+                    fb_col1, _ = st.columns([1, 4])
+                    with fb_col1:
+                        rating = st.feedback("thumbs", key=f"fb_widget_{idx}")
+                        if rating is not None:
+                            rating_str = "thumbs_up" if rating == 1 else "thumbs_down"
+                            if submit_feedback(rating_str, "", message.get("question", "")):
+                                st.session_state[f"feedback_{idx}"] = rating_str
+                                st.toast("Feedback recorded to data/feedback.jsonl!", icon="✅")
+                                st.rerun()
+
+    # User Input
+    user_query = st.chat_input("Ask a question about the indexed documentation...") or selected_prompt
+
+    if user_query:
+        st.session_state.messages.append({"role": "user", "content": user_query})
+        with st.chat_message("user"):
+            st.markdown(user_query)
+
+        with st.chat_message("assistant"):
+            with st.spinner("Analyzing query, retrieving chunks & grading relevance..."):
+                try:
+                    response = submit_query(user_query)
+                    answer = response.get("answer", "No answer returned.")
+                    st.markdown(answer)
+
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": answer,
+                        "question": user_query,
+                        "metadata": {
+                            "query_type": response.get("query_type"),
+                            "rewritten_query": response.get("rewritten_query"),
+                            "retry_count": response.get("retry_count"),
+                            "sources": response.get("sources", []),
+                            "generation_supported": response.get("generation_supported"),
+                        },
+                    })
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"Failed to generate answer: {str(e)}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 2: Document Management & Ingestion
+# ─────────────────────────────────────────────────────────────────────────────
+with tab_docs:
+    st.subheader("📁 Ingest New Documentation")
+    st.markdown("Upload files from your computer or ingest from public documentation URLs.")
+
+    upload_col, url_col = st.columns(2)
+
+    with upload_col:
+        st.markdown("#### 📄 Upload Local Files")
         uploaded_files = st.file_uploader(
-            "Upload (.md, .txt, .html, .pdf)",
+            "Select documentation files (`.md`, `.txt`, `.html`, `.pdf`)",
             type=["md", "txt", "html", "pdf"],
             accept_multiple_files=True,
+            key="file_uploader_widget",
         )
-        if uploaded_files and st.button("Ingest Files", use_container_width=True):
-            with st.spinner("Chunking & indexing into ChromaDB..."):
-                try:
-                    result = upload_files(uploaded_files)
-                    st.success(f"Added {result.get('total_chunks_added', 0)} chunks!")
-                    if result.get("errors"):
-                        for e in result["errors"]:
-                            st.warning(f"{e['source']}: {e['error']}")
-                    st.rerun()
-                except Exception as ex:
-                    st.error(str(ex))
 
-    # URL fetch tab
-    with st.expander("Ingest from URL"):
-        input_url = st.text_input("Raw Markdown or HTML URL")
-        if input_url and st.button("Fetch & Ingest URL", use_container_width=True):
-            with st.spinner("Fetching URL with SSRF checks..."):
-                try:
-                    result = ingest_url(input_url)
-                    st.success(f"Added {result.get('total_chunks_added', 0)} chunks!")
-                    if result.get("errors"):
-                        for e in result["errors"]:
-                            st.warning(f"{e['source']}: {e['error']}")
-                    st.rerun()
-                except Exception as ex:
-                    st.error(str(ex))
+        if uploaded_files:
+            st.caption(f"Selected {len(uploaded_files)} file(s): " + ", ".join([f.name for f in uploaded_files]))
 
+            if st.button("🚀 Ingest Selected Files", type="primary", use_container_width=True):
+                with st.spinner("Processing documents, splitting into chunks & generating embeddings..."):
+                    try:
+                        result = upload_files(uploaded_files)
+                        added = result.get("total_chunks_added", 0)
 
-# ── Main Q&A Interface ───────────────────────────────────────────────────────
-st.title("🤖 Technical Documentation Assistant")
-st.caption("Powered by LangGraph Self-Corrective Workflow, ChromaDB & FastAPI")
+                        if added > 0:
+                            st.success(f"🎉 Successfully ingested! Added **{added} chunks** into ChromaDB.")
+                        else:
+                            st.warning("No new chunks added. (Files might already be indexed or contained duplicate content).")
 
-# Initialize Chat History
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+                        # Display per-file breakdown
+                        for item in result.get("ingested", []):
+                            st.markdown(f"- **{item['source']}**: `{item['chunks_added']} added`, `{item['chunks_skipped_duplicate']} skipped (duplicates)`")
 
-# Suggested Sample Questions
-st.markdown("**Quick Prompts:**")
-sample_cols = st.columns(4)
-sample_prompts = [
-    "How do I add a conditional edge in LangGraph?",
-    "What is a StateGraph and how do nodes work?",
-    "How does ChromaDB persist embeddings to disk?",
-    "Explain quantum superposition in physics.",
-]
+                        if result.get("errors"):
+                            for err in result["errors"]:
+                                st.error(f"❌ Error in {err['source']}: {err['error']}")
 
-selected_prompt = None
-for i, prompt in enumerate(sample_prompts):
-    with sample_cols[i]:
-        if st.button(prompt, key=f"sample_{i}", use_container_width=True):
-            selected_prompt = prompt
+                    except Exception as ex:
+                        st.error(f"Upload failed: {str(ex)}")
 
-# Render Existing Messages
-for idx, message in enumerate(st.session_state.messages):
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    with url_col:
+        st.markdown("#### 🌐 Ingest from URL")
+        input_url = st.text_input(
+            "Enter raw document or web documentation URL",
+            placeholder="https://raw.githubusercontent.com/.../README.md",
+        )
 
-        if message["role"] == "assistant" and "metadata" in message:
-            meta = message["metadata"]
+        if st.button("📥 Fetch & Ingest URL", use_container_width=True):
+            if not input_url:
+                st.warning("Please enter a URL first.")
+            else:
+                with st.spinner("Fetching URL and generating embeddings..."):
+                    try:
+                        result = ingest_url(input_url)
+                        added = result.get("total_chunks_added", 0)
+                        if added > 0:
+                            st.success(f"🎉 Added **{added} chunks** from URL!")
+                        else:
+                            st.warning("No new chunks added (duplicate content).")
 
-            # Citations and pipeline drawer
-            with st.expander("🔍 Pipeline Trace & Citations"):
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    st.caption(f"**Query Type:** `{meta.get('query_type')}`")
-                with col_b:
-                    st.caption(f"**Retries Used:** `{meta.get('retry_count')}`")
-                with col_c:
-                    status = "✅ Grounded" if meta.get("generation_supported") else "⚠️ Fallback"
-                    st.caption(f"**Status:** {status}")
+                        for err in result.get("errors", []):
+                            st.error(f"❌ {err['source']}: {err['error']}")
 
-                st.markdown(f"**Rewritten Query:** `{meta.get('rewritten_query')}`")
+                    except Exception as ex:
+                        st.error(f"URL Ingestion failed: {str(ex)}")
 
-                sources = meta.get("sources", [])
-                if sources:
-                    st.markdown("**Citations:**")
-                    for s in sources:
-                        heading = f" — *{s['heading']}*" if s.get("heading") else ""
-                        st.markdown(f"- 📄 `{s['source']}`{heading} (`{s['chunk_id']}`)")
-                else:
-                    st.info("No source chunks utilized (fallback path triggered).")
+    st.markdown("---")
+    st.subheader("📋 Currently Indexed Documents")
+    current_docs = fetch_documents()
 
-            # Feedback component
-            if f"feedback_{idx}" not in st.session_state:
-                fb_col1, fb_col2 = st.columns([1, 4])
-                with fb_col1:
-                    rating = st.feedback("thumbs", key=f"fb_widget_{idx}")
-                    if rating is not None:
-                        rating_str = "thumbs_up" if rating == 1 else "thumbs_down"
-                        if submit_feedback(rating_str, "", message.get("question", "")):
-                            st.session_state[f"feedback_{idx}"] = rating_str
-                            st.toast("Feedback recorded! Stored in data/feedback.jsonl", icon="✅")
-                            st.rerun()
+    if current_docs:
+        for doc in current_docs:
+            d_col1, d_col2, d_col3 = st.columns([3, 1, 1])
+            with d_col1:
+                st.markdown(f"**{doc['source']}** (`{doc['doc_id']}`)")
+                if doc.get("title"):
+                    st.caption(f"Title: {doc['title']}")
+            with d_col2:
+                st.markdown(f"`{doc['chunks']} chunks`")
+            with d_col3:
+                if st.button("Delete", key=f"del_{doc['doc_id']}"):
+                    if delete_single_document(doc["doc_id"]):
+                        st.toast(f"Deleted {doc['source']}", icon="🗑️")
+                        st.rerun()
+                    else:
+                        st.error("Delete failed.")
+            st.divider()
 
-# Handle New User Input
-user_query = st.chat_input("Ask a question about the indexed documentation...") or selected_prompt
-
-if user_query:
-    # Append user question
-    st.session_state.messages.append({"role": "user", "content": user_query})
-    with st.chat_message("user"):
-        st.markdown(user_query)
-
-    # Invoke FastAPI backend
-    with st.chat_message("assistant"):
-        with st.spinner("Analyzing query, retrieving chunks & grading relevance..."):
-            try:
-                response = submit_query(user_query)
-                answer = response.get("answer", "No answer returned.")
-                st.markdown(answer)
-
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": answer,
-                    "question": user_query,
-                    "metadata": {
-                        "query_type": response.get("query_type"),
-                        "rewritten_query": response.get("rewritten_query"),
-                        "retry_count": response.get("retry_count"),
-                        "sources": response.get("sources", []),
-                        "generation_supported": response.get("generation_supported"),
-                    },
-                })
+        if st.button("🗑️ Wipe All Documents", type="secondary"):
+            if clear_all_documents():
+                st.toast("Cleared all documents!", icon="🗑️")
                 st.rerun()
-
-            except Exception as e:
-                st.error(f"Failed to generate answer: {str(e)}")
+            else:
+                st.error("Failed to clear documents.")
+    else:
+        st.info("The vector store is currently empty. Use the upload box above to ingest your first document!")

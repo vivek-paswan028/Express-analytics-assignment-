@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     chunk_size: int = 800
     chunk_overlap: int = 100
     max_upload_size_mb: int = 5
+    auto_ingest_corpus: bool = False  # Set to True only if automatic sample corpus loading is desired
 
     # ── FastAPI ───────────────────────────────────────────────────────
     app_host: str = "0.0.0.0"
