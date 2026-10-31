@@ -23,6 +23,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.config import get_settings
+from rag.llm import get_gemini_llm
 from rag.state import RAGState, SourceMetadata
 
 logger = logging.getLogger(__name__)
@@ -106,11 +107,7 @@ def generation_node(state: RAGState) -> dict:
     )
 
     try:
-        llm = ChatGoogleGenerativeAI(
-            model=settings.llm_model,
-            temperature=settings.llm_temperature,
-            google_api_key=settings.google_api_key,
-        )
+        llm = get_gemini_llm(temperature=settings.llm_temperature)
 
         response = llm.invoke([
             SystemMessage(content=_GENERATION_SYSTEM_PROMPT),

@@ -29,6 +29,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
+from rag.llm import get_gemini_llm
 from rag.state import RAGState
 
 logger = logging.getLogger(__name__)
@@ -115,11 +116,7 @@ def grading_node(state: RAGState) -> dict:
         return {"relevant_documents": []}
 
     try:
-        llm = ChatGoogleGenerativeAI(
-            model=settings.llm_model,
-            temperature=0.0,  # grading must be deterministic
-            google_api_key=settings.google_api_key,
-        )
+        llm = get_gemini_llm(temperature=0.0)  # grading must be deterministic
         grader = llm.with_structured_output(DocumentGrade)
 
         relevant: list[Document] = []

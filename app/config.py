@@ -22,8 +22,9 @@ class Settings(BaseSettings):
         extra="ignore",  # silently ignore unrecognised env vars
     )
 
-    # ── LLM ──────────────────────────────────────────────────────────
+    # ── LLM (supports latest Google Gemini API: GEMINI_API_KEY or GOOGLE_API_KEY)
     google_api_key: str = ""
+    gemini_api_key: str = ""
     llm_model: str = "gemini-2.0-flash"
     llm_temperature: float = 0.0
 
@@ -72,8 +73,13 @@ class Settings(BaseSettings):
         return p
 
     @property
+    def effective_api_key(self) -> str:
+        """Returns GEMINI_API_KEY if present, otherwise GOOGLE_API_KEY."""
+        return self.gemini_api_key.strip() or self.google_api_key.strip()
+
+    @property
     def has_llm_key(self) -> bool:
-        return bool(self.google_api_key)
+        return bool(self.effective_api_key)
 
 
 @lru_cache(maxsize=1)

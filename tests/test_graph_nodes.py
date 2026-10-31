@@ -181,10 +181,10 @@ class TestQueryAnalysisNode:
             rewritten="add conditional edge LangGraph StateGraph routing",
         )
 
-        with patch("rag.nodes.query_analysis.ChatGoogleGenerativeAI") as mock_llm_cls:
+        with patch("rag.nodes.query_analysis.get_gemini_llm") as mock_get_llm:
             mock_llm = MagicMock()
             mock_llm.with_structured_output.return_value.invoke.return_value = mock_result
-            mock_llm_cls.return_value = mock_llm
+            mock_get_llm.return_value = mock_llm
 
             result = query_analysis_node(_make_state(
                 original_question="How do I add a conditional edge?",
@@ -200,10 +200,10 @@ class TestQueryAnalysisNode:
 
         mock_result = self._mock_analysis_result(rewritten="alternative query formulation")
 
-        with patch("rag.nodes.query_analysis.ChatGoogleGenerativeAI") as mock_llm_cls:
+        with patch("rag.nodes.query_analysis.get_gemini_llm") as mock_get_llm:
             mock_llm = MagicMock()
             mock_llm.with_structured_output.return_value.invoke.return_value = mock_result
-            mock_llm_cls.return_value = mock_llm
+            mock_get_llm.return_value = mock_llm
 
             result = query_analysis_node(_make_state(
                 original_question="What is LangGraph?",
@@ -218,10 +218,10 @@ class TestQueryAnalysisNode:
         """Node falls back to original question if LLM throws."""
         from rag.nodes.query_analysis import query_analysis_node
 
-        with patch("rag.nodes.query_analysis.ChatGoogleGenerativeAI") as mock_llm_cls:
+        with patch("rag.nodes.query_analysis.get_gemini_llm") as mock_get_llm:
             mock_llm = MagicMock()
             mock_llm.with_structured_output.return_value.invoke.side_effect = Exception("API error")
-            mock_llm_cls.return_value = mock_llm
+            mock_get_llm.return_value = mock_llm
 
             result = query_analysis_node(_make_state(
                 original_question="What is ChromaDB?",
@@ -249,10 +249,10 @@ class TestGradingNode:
                 return DocumentGrade(score="relevant", reasoning="On topic.")
             return DocumentGrade(score="irrelevant", reasoning="Off topic.")
 
-        with patch("rag.nodes.grading.ChatGoogleGenerativeAI") as mock_llm_cls:
+        with patch("rag.nodes.grading.get_gemini_llm") as mock_get_llm:
             mock_llm = MagicMock()
             mock_llm.with_structured_output.return_value.invoke = mock_invoke
-            mock_llm_cls.return_value = mock_llm
+            mock_get_llm.return_value = mock_llm
 
             state = _make_state(
                 retrieved_documents=[relevant_doc, irrelevant_doc],

@@ -26,6 +26,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
+from rag.llm import get_gemini_llm
 from rag.state import RAGState
 
 logger = logging.getLogger(__name__)
@@ -52,11 +53,7 @@ class QueryAnalysisResult(BaseModel):
 
 
 def _build_llm() -> ChatGoogleGenerativeAI:
-    return ChatGoogleGenerativeAI(
-        model=settings.llm_model,
-        temperature=settings.llm_temperature,
-        google_api_key=settings.google_api_key,
-    )
+    return get_gemini_llm(temperature=settings.llm_temperature)
 
 
 def query_analysis_node(state: RAGState) -> dict:
