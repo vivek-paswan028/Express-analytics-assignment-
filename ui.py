@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
 
 # ── API Helper Functions ─────────────────────────────────────────────────────
@@ -31,6 +31,14 @@ def fetch_health():
             return res.json()
     except Exception:
         pass
+    # Try localhost fallback if 127.0.0.1 didn't respond
+    if "127.0.0.1" in API_BASE_URL:
+        try:
+            res = requests.get(f"{API_BASE_URL.replace('127.0.0.1', 'localhost')}/health", timeout=3)
+            if res.status_code == 200:
+                return res.json()
+        except Exception:
+            pass
     return None
 
 
@@ -66,10 +74,14 @@ def submit_query(question: str, top_k: int = 5):
         json={"question": question, "top_k": top_k},
         timeout=60,
     )
+    try:
+        data = res.json()
+    except Exception:
+        data = {"detail": res.text}
     if res.status_code == 200:
-        return res.json()
+        return data
     else:
-        err_msg = res.json().get("detail", res.text)
+        err_msg = data.get("detail", res.text)
         raise RuntimeError(f"API Error ({res.status_code}): {err_msg}")
 
 
@@ -87,10 +99,14 @@ def submit_feedback(rating: str, comment: str, question: str):
 
 def upload_files(files):
     upload_list = [("files", (f.name, f.getvalue(), f.type or "application/octet-stream")) for f in files]
-    res = requests.post(f"{API_BASE_URL}/ingest", files=upload_list, timeout=60)
+    res = requests.post(f"{API_BASE_URL}/ingest", files=upload_list, timeout=120)
+    try:
+        data = res.json()
+    except Exception:
+        data = {"detail": res.text}
     if res.status_code == 200:
-        return res.json()
-    raise RuntimeError(res.json().get("detail", res.text))
+        return data
+    raise RuntimeError(f"Upload failed ({res.status_code}): {data.get('detail', res.text)}")
 
 
 def ingest_url(url: str):
@@ -99,14 +115,18 @@ def ingest_url(url: str):
         json={"urls": [url]},
         timeout=30,
     )
+    try:
+        data = res.json()
+    except Exception:
+        data = {"detail": res.text}
     if res.status_code == 200:
-        return res.json()
-    raise RuntimeError(res.json().get("detail", res.text))
+        return data
+    raise RuntimeError(f"URL ingest failed ({res.status_code}): {data.get('detail', res.text)}")
 
 
-# ── Sidebar: System Health & Quick Controls ──────────────────────────────────
+# ── Sidebar: System Health & Navigation ───────────────────────────────────────
 with st.sidebar:
-    st.title("⚙️ System Status")
+    st.title("⚙️ System Control")
     health = fetch_health()
 
     if health:
@@ -118,6 +138,14 @@ with st.sidebar:
             st.metric("Total Chunks", health.get("indexed_chunks", 0))
     else:
         st.error(f"🔴 **FastAPI Offline**\nCannot connect to `{API_BASE_URL}`.\nRun: `uvicorn app.main:app --reload`")
+
+    st.markdown("---")
+    page_nav = st.radio(
+        "Navigation",
+        ["💬 Ask Questions (Chat)", "📁 Manage & Ingest Documents"],
+        index=0,
+        label_visibility="collapsed",
+    )
 
     st.markdown("---")
     st.subheader("📚 Quick Document List")
@@ -133,20 +161,18 @@ with st.sidebar:
             else:
                 st.error("Failed to clear documents.")
     else:
-        st.info("No documents currently indexed. Go to the **Manage Documents** tab to upload.")
+        st.info("No documents currently indexed.")
 
 
-# ── Main Content Area: Tabs ──────────────────────────────────────────────────
+# ── Main Content Area ────────────────────────────────────────────────────────
 st.title("🤖 Technical Documentation Assistant")
 st.caption("Self-corrective RAG with LangGraph, ChromaDB, and FastAPI")
 
-tab_chat, tab_docs = st.tabs(["💬 Ask Questions (Chat)", "📁 Manage Documents & Ingestion"])
-
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TAB 1: Chat Q&A
+# VIEW 1: Chat Q&A
 # ─────────────────────────────────────────────────────────────────────────────
-with tab_chat:
+if page_nav == "💬 Ask Questions (Chat)":
     # Initialize Chat History
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -245,11 +271,11 @@ with tab_chat:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TAB 2: Document Management & Ingestion
+# VIEW 2: Document Management & Ingestion
 # ─────────────────────────────────────────────────────────────────────────────
-with tab_docs:
+elif page_nav == "📁 Manage & Ingest Documents":
     st.subheader("📁 Ingest New Documentation")
-    st.markdown("Upload files from your computer or ingest from public documentation URLs.")
+    st.markdown("Upload documents or enter URLs to index them into ChromaDB.")
 
     upload_col, url_col = st.columns(2)
 
@@ -274,7 +300,7 @@ with tab_docs:
                         if added > 0:
                             st.success(f"🎉 Successfully ingested! Added **{added} chunks** into ChromaDB.")
                         else:
-                            st.warning("No new chunks added. (Files might already be indexed or contained duplicate content).")
+                            st.warning("No new chunks added. (Files might already be indexed or contain duplicate content).")
 
                         # Display per-file breakdown
                         for item in result.get("ingested", []):
