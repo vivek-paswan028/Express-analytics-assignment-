@@ -193,6 +193,21 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Redoc Interface: `http://localhost:8000/redoc`
 - Health Check: `http://localhost:8000/health`
 
+### 5. Launch the Interactive Streamlit UI (Bonus Feature)
+
+In a separate terminal tab, run:
+
+```bash
+streamlit run ui.py
+```
+
+The UI will automatically open at `http://localhost:8501`. Features include:
+- **Interactive Chat Q&A**: Submit queries with real-time feedback and stream view.
+- **Pipeline Inspector**: Expandable drawer showing the query classification, rewritten query, self-correction retry counter, and source citations.
+- **Corpus Dashboard**: View all indexed documents and their chunk counts directly from the sidebar.
+- **Document Management**: Drag-and-drop local file uploader (`POST /ingest`) and URL fetcher (`POST /ingest/url`).
+- **One-Click Thumbs Up / Down Feedback**: Submits evaluations directly to `data/feedback.jsonl`.
+
 ---
 
 ## 6. API Reference & Examples
@@ -414,3 +429,4 @@ tests/test_ingestion.py ...............s                                [100%]
 2. **Hybrid Search (BM25 + Dense Vectors)**: Implement Reciprocal Rank Fusion (RRF) combining keyword search with semantic vectors to improve precision on exact code identifiers and function names.
 3. **Web Search Fallback**: Integrate Tavily API to dynamically pull from live developer documentation when the local corpus doesn't contain the requested topic.
 4. **Interactive UI**: Add a minimal Gradio/Streamlit interface with conversational session memory.
+
