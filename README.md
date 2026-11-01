@@ -150,7 +150,8 @@ Technical documentation contains mixed prose, function signatures, lists, and co
 ### 1. Clone & Set Up Virtual Environment
 
 ```bash
-cd rag-docs-assistant
+git clone https://github.com/vivek-paswan028/Express-analytics-assignment-.git
+cd Express-analytics-assignment-
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
